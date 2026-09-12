@@ -1,0 +1,242 @@
+# Pi-hole + Unbound
+# Clients -> Pi-hole (block) -> Unbound (DNSSEC + LAN DoT :853) -> dnscrypt-proxy (anonymized) -> internet
+# Unbound is not published on the LAN. Only Pi-hole DNS (53) is.
+# Admin UI is loopback-only; Tailscale Serve fronts it with HTTPS.
+# Host binds are IPv4-only. Never 0.0.0.0 or [::]
+# (this PC has a global IPv6 address; a wildcard bind would be an open resolver).
+# Tailscale 100.x DNS publishes live in docker-compose.tailscale.yml (not a wildcard).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  dnscrypt:
+    container_name: dnscrypt
+    image: klutchell/dnscrypt-proxy:latest
+    hostname: dnscrypt
+    networks:
+      default:
+        ipv4_address: 172.30.90.2
+    restart: unless-stopped
+    cpu_shares: 1024
+    logging: *default-logging
+    volumes:
+      - ./dnscrypt/dnscrypt-proxy.toml:/config/dnscrypt-proxy.toml:ro
+      - dnscrypt_cache:/data
+    # Not published to LAN — only Unbound reaches it on the compose network.
+    expose:
+      - "5353"
+    healthcheck:
+      test: ["CMD", "dnscrypt-proxy", "-config", "/config/dnscrypt-proxy.toml", "-check"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+
+  unbound:
+    container_name: unbound
+    image: klutchell/unbound:latest
+    hostname: unbound
+    depends_on:
+      dnscrypt:
+        condition: service_healthy
+    restart: unless-stopped
+    user: "101:102"
+    cpu_shares: 2048
+    logging: *default-logging
+    ports:
+      # LAN DNS-over-TLS (Private DNS / DoT clients). Never 0.0.0.0.
+      - "127.0.0.1:853:853/tcp"
+      - "${LAN_IPV4}:853:853/tcp"
+    volumes:
+      - ./unbound/custom.conf.d:/etc/unbound/custom.conf.d:ro
+      # Arch CA bundle for Unbound DNS-over-TLS (Quad9).
+      - /etc/ca-certificates/extracted/tls-ca-bundle.pem:/etc/unbound/ca-certificates.crt:ro
+      - ./unbound/tls.key:/etc/unbound/tls.key:ro
+      - ./unbound/tls.pem:/etc/unbound/tls.pem:ro
+    healthcheck:
+      test: ["CMD", "drill-hc", "@127.0.0.1", "dnssec.works"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 45s
+
+  pihole:
+    container_name: pihole
+    image: pihole/pihole:2026.07.2
+    hostname: pihole
+    depends_on:
+      unbound:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:53:53/tcp"
+      - "127.0.0.1:53:53/udp"
+      - "${LAN_IPV4}:53:53/tcp"
+      - "${LAN_IPV4}:53:53/udp"
+      # Optional LAN IPv6 (EUI-64 only). Never [::].
+      # Uncomment and set LAN_IPV6 in .env if you need IPv6 DNS on the LAN:
+      # - "[${LAN_IPV6}]:53:53/tcp"
+      # - "[${LAN_IPV6}]:53:53/udp"
+      - "127.0.0.1:80:80/tcp"
+      - "127.0.0.1:443:443/tcp"
+    environment:
+      TZ: America/New_York
+      FTLCONF_webserver_api_password: ${FTLCONF_webserver_api_password}
+      # ALL is required inside Docker (LAN clients are not on a container-local subnet).
+      # Host publish + UFW/DOCKER-USER are what stop this from being an open resolver.
+      FTLCONF_dns_listeningMode: ALL
+      # Unbound is the only upstream. Do not add 1.1.1.1 here or ads leak.
+      FTLCONF_dns_upstreams: unbound
+      # Unbound already validates; double-validation causes false SERVFAILs.
+      FTLCONF_dns_dnssec: "false"
+      FTLCONF_dns_revServers: "true,${LAN_CIDR},${LAN_GATEWAY},lan"
+      FTLCONF_dns_domain_name: lan
+      FTLCONF_dns_expandHosts: "true"
+      FTLCONF_dns_domainNeeded: "true"
+      FTLCONF_dns_bogusPriv: "true"
+      FTLCONF_dns_hosts: "${LAN_IPV4} pihole.lan pi.hole;${TAILSCALE_IPV4} pihole.lan pi.hole"
+      # Expert profile (2026-09-10): EDE CODE, deep CNAME/ESNI; cache capped at 10000 (dnsmasq warn).
+      FTLCONF_dns_cache_size: "10000"
+      FTLCONF_dns_rateLimit_count: "1000"
+      FTLCONF_dns_rateLimit_interval: "60"
+      FTLCONF_dns_EDNS0ECS: "false"
+      FTLCONF_dns_blocking_mode: NULL
+      FTLCONF_dns_blocking_edns: CODE
+      # CNAME inspect was sinking Facebook graph/gateway via star.c10r CNAME chains.
+      FTLCONF_dns_CNAMEdeepInspect: "false"
+      FTLCONF_dns_blockESNI: "true"
+      FTLCONF_dns_queryLogging: "true"
+      FTLCONF_dns_specialDomains_mozillaCanary: "true"
+      FTLCONF_dns_specialDomains_iCloudPrivateRelay: "true"
+      FTLCONF_resolver_resolveIPv4: "false"
+      FTLCONF_resolver_resolveIPv6: "false"
+      # Longer local history once Expert unlocks privacy/history panes (still on-box only).
+      FTLCONF_database_maxDBdays: "30"
+      FTLCONF_database_network_expire: "30"
+      FTLCONF_webserver_api_maxHistory: "604800"
+      FTLCONF_webserver_api_prettyJSON: "true"
+      FTLCONF_misc_privacylevel: "0"
+      # UI is loopback + Tailscale Serve (source 127.0.0.1). Exporter is 172.16/12.
+      FTLCONF_webserver_acl: "+127.0.0.1,+[::1],+172.16.0.0/12"
+      # Do not listen on [::] inside the container either.
+      FTLCONF_webserver_port: "80o,443os"
+      FTLCONF_webserver_interface_boxed: "true"
+      FTLCONF_webserver_interface_theme: default-dark
+      # Docker cannot set the host clock; do not serve NTP on 123/udp either.
+      FTLCONF_ntp_sync_active: "false"
+      FTLCONF_ntp_ipv4_active: "false"
+      FTLCONF_ntp_ipv6_active: "false"
+      # Max CPU priority for DNS under desktop load (needs SYS_NICE).
+      FTLCONF_misc_nice: "-20"
+      # Admin UI is loopback/Tailscale Serve only; cut CivetWeb thread pool.
+      FTLCONF_webserver_threads: "10"
+      FTLCONF_misc_check_load: "false"
+      # Overlay bind-mounts are owned by UID 1000; root git otherwise errors
+      # "dubious ownership" and diagnosis/version checks report null.
+      GIT_CONFIG_GLOBAL: /etc/pihole/gitconfig
+    volumes:
+      - ./etc-pihole:/etc/pihole
+      - ./src/web:/var/www/html/admin:ro
+      - ./src/core:/etc/.pihole:ro
+      - ./src/core/pihole:/usr/local/bin/pihole:ro
+      - ./src/opt-pihole:/opt/pihole:ro
+    cap_add:
+      - NET_ADMIN
+      - SYS_NICE
+    cpu_shares: 2048
+    restart: unless-stopped
+    # Container bootstrap only. FTL upstream is Unbound, not these.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/admin/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # ChristopherAlphonse/pihole monitoring stack (exporter + Prometheus + Grafana)
+  pihole-exporter:
+    container_name: pihole-exporter
+    build:
+      context: ./monitoring
+      dockerfile: Dockerfile
+    environment:
+      PIHOLE_HOSTNAME: pihole
+      PIHOLE_PORT: "80"
+      PIHOLE_PASSWORD: ${FTLCONF_webserver_api_password}
+      PIHOLE_PROTOCOL: http
+      EXPORTER_PORT: "9617"
+    volumes:
+      - ./etc-pihole:/etc/pihole:ro
+    ports:
+      - "127.0.0.1:9617:9617"
+    cpu_shares: 128
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      pihole:
+        condition: service_healthy
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    cpu_shares: 256
+    cpus: 0.5
+    mem_limit: 384m
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      - pihole-exporter
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_SERVER_ROOT_URL: http://127.0.0.1:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    cpu_shares: 256
+    cpus: 0.5
+    mem_limit: 512m
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      - prometheus
+
+volumes:
+  dnscrypt_cache:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    driver: bridge
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: 172.30.90.0/24

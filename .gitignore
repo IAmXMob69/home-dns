@@ -1,0 +1,9 @@
+.env
+etc-pihole/
+unbound/tls.key
+unbound/tls.pem
+*.pem
+*.key
+backups/
+logs/
+__pycache__/

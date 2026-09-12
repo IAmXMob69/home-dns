@@ -1,0 +1,73 @@
+# Vault.OS / Pi-hole — anonymized encrypted upstream (200 IQ)
+# Pi-hole -> Unbound -> dnscrypt-proxy -> anonymized relays -> DoH/DoT/DNSCrypt resolvers
+# Relays see your IP but not the query; resolvers see the query but not your IP.
+listen_addresses = ['0.0.0.0:5353']
+max_clients = 250
+ipv4_servers = true
+ipv6_servers = false
+dnscrypt_servers = true
+doh_servers = true
+odoh_servers = true
+require_dnssec = true
+require_nolog = true
+require_nofilter = true
+server_names = ['cloudflare', 'quad9-dnscrypt-ip4-nofilter-pri', 'quad9-doh-ip4-port443-nofilter-pri', 'quad9-doh-ip4-port443-nofilter-alt', 'dns.sb', 'dnscrypt.ca-1', 'dnscrypt.ca-2', 'cs-usny', 'cs-usil', 'cs-usse', 'cs-uswa', 'mullvad-base-doh']
+
+force_tcp = false
+timeout = 5000
+keepalive = 30
+lb_strategy = 'p2'
+lb_estimator = true
+log_level = 2
+cache = true
+cache_size = 4096
+cache_min_ttl = 60
+cache_max_ttl = 86400
+bootstrap_resolvers = ['9.9.9.9:53', '1.1.1.1:53']
+ignore_system_dns = true
+netprobe_timeout = 60
+netprobe_address = '9.9.9.9:53'
+
+[anonymized_dns]
+skip_incompatible = true
+routes = [
+  { server_name = '*', via = ['anon-cs-il', 'anon-cs-nyc', 'anon-cs-sea', 'anon-kama', 'anon-sfo', 'odohrelay-crypto-sx'] }
+]
+
+[sources.public-resolvers]
+urls = [
+  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/public-resolvers.md',
+  'https://download.dnscrypt.info/resolvers-list/v3/public-resolvers.md'
+]
+cache_file = '/data/public-resolvers.md'
+minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
+refresh_delay = 72
+
+[sources.relays]
+urls = [
+  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/relays.md',
+  'https://download.dnscrypt.info/resolvers-list/v3/relays.md'
+]
+cache_file = '/data/relays.md'
+minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
+refresh_delay = 72
+prefix = 'anon-'
+
+[sources.odoh-servers]
+urls = [
+  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-servers.md',
+  'https://download.dnscrypt.info/resolvers-list/v3/odoh-servers.md'
+]
+cache_file = '/data/odoh-servers.md'
+minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
+refresh_delay = 72
+
+[sources.odoh-relays]
+urls = [
+  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-relays.md',
+  'https://download.dnscrypt.info/resolvers-list/v3/odoh-relays.md'
+]
+cache_file = '/data/odoh-relays.md'
+minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
+refresh_delay = 72
+prefix = 'odohrelay-'
