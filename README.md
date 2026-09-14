@@ -69,7 +69,19 @@ Full walkthrough: [SETUP-windows.md](./SETUP-windows.md)
 | **dnscrypt** | No | Works in the background. |
 | **Grafana** (graphs, optional) | Yes, only if you turn graphs on | Browser: http://127.0.0.1:3000 — user `admin` — password from `.env` (`GRAFANA_ADMIN_PASSWORD`). |
 | **Tailscale** (see the page from your phone, optional) | Yes, only if you install Tailscale | App or https://login.tailscale.com — Google / Microsoft / GitHub / email. Then open the Pi-hole link Tailscale gives you. Still use the **Pi-hole** password on that page. |
-| **Geo-lock** (Linux only, optional) | No | A firewall setting. No website login. |
+| **Geo-lock** (optional) | No | In Pi-hole: **Group management → Groups → Geo-Location Lock** (on/off). Extra Linux firewall: `sudo ./scripts/geolock-apply.sh`. |
+
+## Geo-Location Lock (in Pi-hole)
+
+This is a switch **inside Pi-hole**, not a GitHub setting.
+
+```bash
+./scripts/geolock-pihole.sh
+```
+
+Then http://127.0.0.1/admin/ → sign in with the Pi-hole password → **Group management** → **Groups** → **Geo-Location Lock** on or off.
+
+On = block India, Africa, Israel, and Saudi names. Off = those names work. Do not delete the list; use the switch.
 
 Do not put `1.1.1.1` into Pi-hole’s DNS servers. That skips the blocker.
 

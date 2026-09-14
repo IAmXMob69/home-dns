@@ -141,9 +141,24 @@ sudo tailscale serve --bg http://127.0.0.1:80
 4. On your phone (on Tailscale), open the `https://….ts.net/admin/` link Tailscale shows.
 5. That page is **still Pi-hole**. Use the **Pi-hole password**, not your Tailscale password.
 
-### Geo-lock (block or allow countries)
+### Geo-Location Lock (in Pi-hole)
 
-Linux only. No website login.
+This is a **group** on the Pi-hole page, not a GitHub setting. No extra login.
+
+After the stack is running:
+
+```bash
+./scripts/geolock-pihole.sh
+```
+
+Then sign into **http://127.0.0.1/admin/** (Pi-hole password) → **Group management** → **Groups**.
+
+- **Geo-Location Lock** On = block India, Africa, Israel, and Saudi names  
+- Off = those sites work again  
+
+Leave the domain list alone. Use the group switch.
+
+Optional extra (Linux firewall on ports 53/853, no website):
 
 ```bash
 cp geolock/settings.env.example geolock/settings.env

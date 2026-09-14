@@ -119,9 +119,19 @@ Sign in at **http://127.0.0.1:3000**
 5. Run `.\install.ps1` again.
 6. On the phone, open the Tailscale URL for this PC. That page is still **Pi-hole** — use the **Pi-hole password**.
 
-### Geo-lock
+### Geo-Location Lock (in Pi-hole)
 
-Not available on Windows (it uses Linux firewall tools). Use the Windows Firewall rules above instead.
+Same as Linux: it is a **group** in the Pi-hole page.
+
+Git Bash or WSL:
+
+```bash
+./scripts/geolock-pihole.sh
+```
+
+Then **http://127.0.0.1/admin/** → sign in with the Pi-hole password → **Group management** → **Groups** → **Geo-Location Lock** on/off.
+
+The extra country firewall script is Linux-only. On Windows, use the firewall rules above.
 
 ## Things that do **not** have a login
 

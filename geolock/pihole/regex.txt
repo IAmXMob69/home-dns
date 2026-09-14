@@ -1,0 +1,8 @@
+# Indian ccTLD (covers .co.in, .gov.in, ...)
+(^|\.)in$
+# Israel
+(^|\.)il$
+# Saudi Arabia
+(^|\.)sa$
+# Africa
+(^|\.)(za|ng|ke|eg|gh|tz|ug|ma|dz|tn|et|ci|sn|cm|ao|mz|zw|zm|rw|sd|ly|mg|mw|ml|bf|ne|td|so|ss|bi|bj|bw|cf|cg|cv|dj|er|ga|gm|gn|gq|gw|km|lr|ls|mr|mu|na|sc|sl|st|sz|tg|cd|re)$
