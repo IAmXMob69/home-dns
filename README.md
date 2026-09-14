@@ -81,7 +81,7 @@ This is a switch **inside Pi-hole**, not a GitHub setting.
 
 Then http://127.0.0.1/admin/ → sign in with the Pi-hole password → **Group management** → **Groups** → **Geo-Location Lock** on or off.
 
-On = block India, rest of South Asia, Africa, Israel, and Saudi names. Off = those names work. Do not delete the list; use the switch.
+On = block India, rest of South Asia, Africa (including Nigeria), Israel, and Saudi names. Off = those names work. Do not delete the list; use the switch.
 
 Do not put `1.1.1.1` into Pi-hole’s DNS servers. That skips the blocker.
 
