@@ -47,7 +47,7 @@ docker compose ps
 Check:
 
 ```bash
-docker exec unbound drill-hc @127.0.0.1 dnssec.works
+docker exec unbound drill @127.0.0.1 dnssec.works
 dig @${LAN_IPV4} example.com +short
 curl -fsS http://127.0.0.1/admin/login >/dev/null && echo "admin UI up"
 ```
@@ -79,7 +79,21 @@ sudo ufw allow from 192.168.1.0/24 to any port 53 proto udp
 
 Compose already binds admin to `127.0.0.1:80` / `127.0.0.1:443` only.
 
-If the host has **global IPv6**, never bind DNS to `[::]`. Use the specific LAN IPv6 via `LAN_IPV6` or skip IPv6 DNS.
+Never bind DNS to `[::]` on a dual-stack host. Use a specific `LAN_IPV6` or skip IPv6 DNS.
+
+## 6b. Geo-location lock (optional)
+
+Off by default. LAN, loopback, and Tailscale CGNAT (`100.64.0.0/10`) always pass.
+
+```bash
+cp geolock/settings.env.example geolock/settings.env
+# GEOLOCK_ENABLED=1
+# GEOLOCK_MODE=allow and GEOLOCK_ALLOW_COUNTRIES=US,DE
+# or GEOLOCK_MODE=deny and GEOLOCK_DENY_COUNTRIES=...
+sudo ./scripts/geolock-apply.sh
+```
+
+Do not commit `geolock/settings.env`.
 
 ## 6. Blocklists
 

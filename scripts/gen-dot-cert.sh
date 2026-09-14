@@ -9,6 +9,7 @@ openssl req -x509 -newkey rsa:2048 -sha256 -days 825 -nodes \
   -out "$ROOT/unbound/tls.pem" \
   -subj "/CN=${CN}" \
   -addext "subjectAltName=DNS:${CN},DNS:pi.hole"
-chmod 600 "$ROOT/unbound/tls.key"
+# 644: Unbound in the container runs as 101:102 and must read the key.
+chmod 644 "$ROOT/unbound/tls.key"
 chmod 644 "$ROOT/unbound/tls.pem"
 echo "Wrote unbound/tls.key and unbound/tls.pem for CN=${CN}"

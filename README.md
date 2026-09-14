@@ -2,7 +2,14 @@
 
 Reproducible **Pi-hole + Unbound + dnscrypt-proxy** (Docker Compose), with optional Prometheus/Grafana and Tailscale Serve for the admin UI.
 
-This is the shape of the stack I run on my LAN. Secrets, live gravity DB, private keys, and exact host identifiers are **not** included — use `.env.example` and `scripts/gen-dot-cert.sh`.
+Secrets, live gravity DB, private keys, and host identifiers are **not** included — use `.env.example` and `scripts/gen-dot-cert.sh`.
+
+```bash
+git clone https://github.com/IAmXMob69/home-dns.git
+cd home-dns
+cp .env.example .env   # set LAN_IPV4 and passwords
+./install.sh
+```
 
 ## Quick path
 
@@ -23,6 +30,8 @@ LAN clients → Pi-hole (block) → Unbound (DNSSEC / DoT) → dnscrypt-proxy (a
 | `monitoring/` | exporter + Prometheus + Grafana provisioning |
 | `.env.example` | all required env vars (copy to `.env`) |
 | `scripts/gen-dot-cert.sh` | local DoT certificate |
+| `install.sh` | CA bundle + cert + `docker compose up` |
+| `geolock/` | optional country gate (off until `settings.env` + `sudo ./scripts/geolock-apply.sh`) |
 
 ## Security
 

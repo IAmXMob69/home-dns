@@ -1,4 +1,4 @@
-# Vault.OS / Pi-hole — anonymized encrypted upstream (200 IQ)
+# Anonymized encrypted upstream
 # Pi-hole -> Unbound -> dnscrypt-proxy -> anonymized relays -> DoH/DoT/DNSCrypt resolvers
 # Relays see your IP but not the query; resolvers see the query but not your IP.
 listen_addresses = ['0.0.0.0:5353']

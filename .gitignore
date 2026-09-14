@@ -2,8 +2,12 @@
 etc-pihole/
 unbound/tls.key
 unbound/tls.pem
+unbound/ca-certificates.crt
+geolock/settings.env
+geolock/cache/
 *.pem
 *.key
 backups/
 logs/
 __pycache__/
+

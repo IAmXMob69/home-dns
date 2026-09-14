@@ -2,9 +2,9 @@
 # Clients -> Pi-hole (block) -> Unbound (DNSSEC + LAN DoT :853) -> dnscrypt-proxy (anonymized) -> internet
 # Unbound is not published on the LAN. Only Pi-hole DNS (53) is.
 # Admin UI is loopback-only; Tailscale Serve fronts it with HTTPS.
-# Host binds are IPv4-only. Never 0.0.0.0 or [::]
-# (this PC has a global IPv6 address; a wildcard bind would be an open resolver).
-# Tailscale 100.x DNS publishes live in docker-compose.tailscale.yml (not a wildcard).
+# Host binds are IPv4-only. Never 0.0.0.0 or [::] on a dual-stack host
+# (a wildcard bind would be an open resolver).
+# Tailscale DNS publishes via docker-compose.tailscale.yml using ${TAILSCALE_IPV4}.
 x-logging: &default-logging
   driver: json-file
   options:
@@ -52,12 +52,12 @@ services:
       - "${LAN_IPV4}:853:853/tcp"
     volumes:
       - ./unbound/custom.conf.d:/etc/unbound/custom.conf.d:ro
-      # Arch CA bundle for Unbound DNS-over-TLS (Quad9).
-      - /etc/ca-certificates/extracted/tls-ca-bundle.pem:/etc/unbound/ca-certificates.crt:ro
+      # Host CA bundle, copied by install.sh (Debian/Ubuntu/Arch paths differ).
+      - ./unbound/ca-certificates.crt:/etc/unbound/ca-certificates.crt:ro
       - ./unbound/tls.key:/etc/unbound/tls.key:ro
       - ./unbound/tls.pem:/etc/unbound/tls.pem:ro
     healthcheck:
-      test: ["CMD", "drill-hc", "@127.0.0.1", "dnssec.works"]
+      test: ["CMD", "drill", "@127.0.0.1", "dnssec.works"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -82,7 +82,7 @@ services:
       - "127.0.0.1:80:80/tcp"
       - "127.0.0.1:443:443/tcp"
     environment:
-      TZ: America/New_York
+      TZ: ${TZ:-UTC}
       FTLCONF_webserver_api_password: ${FTLCONF_webserver_api_password}
       # ALL is required inside Docker (LAN clients are not on a container-local subnet).
       # Host publish + UFW/DOCKER-USER are what stop this from being an open resolver.
@@ -133,15 +133,8 @@ services:
       # Admin UI is loopback/Tailscale Serve only; cut CivetWeb thread pool.
       FTLCONF_webserver_threads: "10"
       FTLCONF_misc_check_load: "false"
-      # Overlay bind-mounts are owned by UID 1000; root git otherwise errors
-      # "dubious ownership" and diagnosis/version checks report null.
-      GIT_CONFIG_GLOBAL: /etc/pihole/gitconfig
     volumes:
       - ./etc-pihole:/etc/pihole
-      - ./src/web:/var/www/html/admin:ro
-      - ./src/core:/etc/.pihole:ro
-      - ./src/core/pihole:/usr/local/bin/pihole:ro
-      - ./src/opt-pihole:/opt/pihole:ro
     cap_add:
       - NET_ADMIN
       - SYS_NICE
@@ -159,8 +152,9 @@ services:
       retries: 5
       start_period: 20s
 
-  # ChristopherAlphonse/pihole monitoring stack (exporter + Prometheus + Grafana)
+  # Optional: docker compose --profile monitoring up -d
   pihole-exporter:
+    profiles: ["monitoring"]
     container_name: pihole-exporter
     build:
       context: ./monitoring
@@ -183,6 +177,7 @@ services:
         condition: service_healthy
 
   prometheus:
+    profiles: ["monitoring"]
     container_name: prometheus
     image: prom/prometheus:latest
     command:
@@ -203,6 +198,7 @@ services:
       - pihole-exporter
 
   grafana:
+    profiles: ["monitoring"]
     container_name: grafana
     image: grafana/grafana:latest
     environment:
