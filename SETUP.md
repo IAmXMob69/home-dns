@@ -155,7 +155,7 @@ Adlists: use the slim set in `blocklists/adlists.example` (7 lists). Do not past
 
 Then sign into **http://127.0.0.1/admin/** (Pi-hole password) → **Group management** → **Groups**.
 
-- **Geo-Location Lock** On = block India, Africa, Israel, and Saudi names  
+- **Geo-Location Lock** On = block India, rest of South Asia, Africa, Israel, and Saudi names  
 - Off = those sites work again  
 
 Leave the domain list alone. Use the group switch.
