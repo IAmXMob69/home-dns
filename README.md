@@ -4,11 +4,22 @@ Reproducible **Pi-hole + Unbound + dnscrypt-proxy** (Docker Compose), with optio
 
 Secrets, live gravity DB, private keys, and host identifiers are **not** included — use `.env.example` and `scripts/gen-dot-cert.sh`.
 
+**Linux**
+
 ```bash
 git clone https://github.com/IAmXMob69/home-dns.git
 cd home-dns
 cp .env.example .env   # set LAN_IPV4 and passwords
 ./install.sh
+```
+
+**Windows** (Docker Desktop)
+
+```powershell
+git clone https://github.com/IAmXMob69/home-dns.git
+cd home-dns
+copy .env.example .env   # set LAN_IPV4 and passwords
+.\install.ps1
 ```
 
 ## Quick path
@@ -17,7 +28,7 @@ cp .env.example .env   # set LAN_IPV4 and passwords
 LAN clients → Pi-hole (block) → Unbound (DNSSEC / DoT) → dnscrypt-proxy (anonymized) → internet
 ```
 
-**Full install:** see [SETUP.md](./SETUP.md).
+**Full install:** [SETUP.md](./SETUP.md) (Linux) or [SETUP-windows.md](./SETUP-windows.md) (Windows).
 
 ## Layout
 
@@ -30,7 +41,8 @@ LAN clients → Pi-hole (block) → Unbound (DNSSEC / DoT) → dnscrypt-proxy (a
 | `monitoring/` | exporter + Prometheus + Grafana provisioning |
 | `.env.example` | all required env vars (copy to `.env`) |
 | `scripts/gen-dot-cert.sh` | local DoT certificate |
-| `install.sh` | CA bundle + cert + `docker compose up` |
+| `install.sh` | Linux: CA bundle + cert + `docker compose up` |
+| `install.ps1` | Windows: same steps for Docker Desktop |
 | `geolock/` | optional country gate (off until `settings.env` + `sudo ./scripts/geolock-apply.sh`) |
 
 ## Security
