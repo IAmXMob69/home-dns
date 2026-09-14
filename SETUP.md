@@ -1,167 +1,174 @@
-# Setup guide
+# Linux setup (plain English)
 
-Build the same shape of stack I run: Pi-hole blocks on the LAN, Unbound does DNSSEC / local DoT, dnscrypt-proxy does anonymized upstream. Admin UI stays on loopback; remote UI is Tailscale Serve.
+This is the long version of the README. You are installing home DNS on **one Linux computer** that stays on at home.
 
 ## What you need
 
-- Linux host with Docker + Compose v2
-- A **stable LAN IPv4** on that host (static DHCP or NetworkManager manual)
-- Optional: Tailscale for remote admin HTTPS
-- Optional: UFW or equivalent firewall
+- A Linux PC that can stay on
+- Docker (the program that runs Pi-hole)
+- About 15 minutes
+- A password you will remember (this becomes your Pi-hole login)
 
-You do **not** need my passwords, Tailscale IPs, Wi‑Fi name, or TLS private key. Generate your own.
+You do **not** need a GitHub account, a Docker account, or anyone else’s passwords.
 
-## 1. Clone and configure
+## Step 1 — Install Docker
+
+Install Docker for your Linux flavor, then log out and back in (or reboot) so your user can run it.
+
+Check:
+
+```bash
+docker version
+```
+
+If that prints a version, you are fine.
+
+## Step 2 — Download this project
+
+Open Terminal:
 
 ```bash
 git clone https://github.com/IAmXMob69/home-dns.git
 cd home-dns
 cp .env.example .env
-$EDITOR .env
+nano .env
 ```
 
-Set at least:
+(`nano` is a simple text editor. Ctrl+O saves. Ctrl+X quits.)
 
-- `FTLCONF_webserver_api_password`
-- `LAN_IPV4` / `LAN_CIDR` / `LAN_GATEWAY`
-- `TAILSCALE_IPV4` if you use Tailscale (`tailscale ip -4`)
+## Step 3 — Fill in three things in `.env`
 
-Edit `docker-compose.yml` binds if your LAN is not `192.168.1.0/24` — search for `${LAN_IPV4}` and the Unbound `access-control` line in `unbound/custom.conf.d/hardening.conf`.
+| Line | What to type | Example |
+|------|----------------|---------|
+| `FTLCONF_webserver_api_password=` | **Your Pi-hole login password** | a long phrase you will not forget |
+| `LAN_IPV4=` | This computer’s home IP | often `192.168.1.50` style, **not** `0.0.0.0` |
+| `LAN_GATEWAY=` | Your router’s IP | often `192.168.1.1` |
+| `LAN_CIDR=` | Your house network | often `192.168.1.0/24` |
 
-## 2. DNS-over-TLS certificate
+Find this PC’s IP:
 
 ```bash
-./scripts/gen-dot-cert.sh pihole.lan
+hostname -I
 ```
 
-Phone Private DNS / DoT clients will need to trust this cert (or use a name you control).
+Use the address that looks like `192.168.x.x` (or `10.x.x.x`). Not `127.0.0.1`.
 
-## 3. Start the DNS chain
+Save the file.
+
+## Step 4 — Start it
 
 ```bash
-mkdir -p etc-pihole
-docker compose up -d dnscrypt unbound pihole
-docker compose ps
+./install.sh
 ```
 
-Check:
+Wait until it finishes. The first run downloads images and can take a few minutes.
+
+## Step 5 — Sign into Pi-hole (the main login)
+
+On **this same computer**, open Firefox or Chrome:
+
+**http://127.0.0.1/admin/**
+
+- There is **no username**.
+- Password = the `FTLCONF_webserver_api_password` value from `.env`.
+- If the page does not load, `./install.sh` did not finish or Docker is not running.
+
+That page is where you see blocked ads, add lists, and change Pi-hole settings.
+
+Do **not** use `http://pi.hole` unless you know it points at `127.0.0.1`. Use the `127.0.0.1` address.
+
+## Step 6 — Tell the house to use this computer for DNS
+
+On your **router** (usually by typing `192.168.1.1` in a browser — that is the router’s own login, not Pi-hole):
+
+1. Sign in with the router sticker / ISP password (that is the **router**, not Pi-hole).
+2. Find DHCP / DNS / LAN settings.
+3. Set DNS to **this PC’s `LAN_IPV4` only**.
+4. Save. Phones may need Wi‑Fi toggled off and on.
+
+On **this Linux PC**, set its own DNS to `127.0.0.1` so it still works if Docker is restarting.
+
+## Step 7 — Lock the door (firewall)
+
+Only devices in your house should use this DNS.
 
 ```bash
-docker exec unbound drill @127.0.0.1 dnssec.works
-dig @${LAN_IPV4} example.com +short
-curl -fsS http://127.0.0.1/admin/login >/dev/null && echo "admin UI up"
-```
-
-## 4. Point the LAN at Pi-hole
-
-On the router: set DHCP DNS to your host `LAN_IPV4` only.
-
-On the host itself: use `127.0.0.1` as DNS (so the box still resolves if Docker is restarting). Example NetworkManager:
-
-```bash
-nmcli connection modify YOUR_WIFI_CONNECTION \
-  ipv4.dns 127.0.0.1 \
-  ipv4.ignore-auto-dns yes
-nmcli connection up YOUR_WIFI_CONNECTION
-```
-
-## 5. Firewall (do not skip)
-
-Allow DNS **only from your LAN**, never from the world:
-
-```bash
-# UFW example — replace with your LAN CIDR
 sudo ufw allow from 192.168.1.0/24 to any port 53 proto tcp
 sudo ufw allow from 192.168.1.0/24 to any port 53 proto udp
-# Do NOT: ufw allow 53
-# Do NOT publish admin 80/443 on the LAN or WAN
 ```
 
-Compose already binds admin to `127.0.0.1:80` / `127.0.0.1:443` only.
+Change `192.168.1.0/24` if your house uses `10.x`.  
+Never run `sudo ufw allow 53` with no “from” — that invites the whole internet.
 
-Never bind DNS to `[::]` on a dual-stack host. Use a specific `LAN_IPV6` or skip IPv6 DNS.
+## Optional logins (skip unless you want them)
 
-## 6b. Geo-location lock (optional)
+### Grafana (pretty graphs)
 
-Off by default. LAN, loopback, and Tailscale CGNAT (`100.64.0.0/10`) always pass.
+Not started unless you ask for it.
 
 ```bash
-cp geolock/settings.env.example geolock/settings.env
-# GEOLOCK_ENABLED=1
-# GEOLOCK_MODE=allow and GEOLOCK_ALLOW_COUNTRIES=US,DE
-# or GEOLOCK_MODE=deny and GEOLOCK_DENY_COUNTRIES=...
-sudo ./scripts/geolock-apply.sh
+docker compose --profile monitoring up -d
 ```
 
-Do not commit `geolock/settings.env`.
+Sign in at **http://127.0.0.1:3000**
 
-## 6. Blocklists
+- Username: `admin`
+- Password: `GRAFANA_ADMIN_PASSWORD` from `.env`
 
-In the Pi-hole UI (`http://127.0.0.1/admin/`):
+### Tailscale (open Pi-hole from your phone when you are not home)
 
-1. Add the public lists you want (StevenBlack, OISD small, Firebog, etc.)
-2. Gravity update
-3. Keep a small allowlist for things CNAME inspection breaks (social CDNs, etc.)
-
-This repo does **not** ship my live gravity database or allowlist.
-
-## 7. Tailscale admin (optional)
-
-Keep Tailscale DNS **off** on the Pi-hole host if this box *is* your DNS (`tailscale set --accept-dns=false`), otherwise MagicDNS can fight Pi-hole.
-
-Serve the UI:
+1. Install Tailscale on this PC and on your phone.
+2. Sign in at **https://login.tailscale.com** with Google, Microsoft, GitHub, or email. Same account on both devices.
+3. On this PC:
 
 ```bash
+tailscale ip -4
+```
+
+Put that number in `.env` as `TAILSCALE_IPV4`. Set:
+
+```
+COMPOSE_FILE=docker-compose.yml:docker-compose.tailscale.yml
+```
+
+Then:
+
+```bash
+sudo tailscale set --accept-dns=false
 sudo tailscale serve --bg http://127.0.0.1:80
 ```
 
-Open `https://YOURHOST.YOURTAILNET.ts.net/admin/` from another Tailscale device.
+4. On your phone (on Tailscale), open the `https://….ts.net/admin/` link Tailscale shows.
+5. That page is **still Pi-hole**. Use the **Pi-hole password**, not your Tailscale password.
 
-When `TAILSCALE_IPV4` is set:
+### Geo-lock (block or allow countries)
 
-```bash
-# .env
-COMPOSE_FILE=docker-compose.yml:docker-compose.tailscale.yml
-docker compose up -d pihole
-```
-
-## 8. Monitoring (optional)
+Linux only. No website login.
 
 ```bash
-# .env must include GRAFANA_ADMIN_PASSWORD
-docker compose up -d pihole-exporter prometheus grafana
+cp geolock/settings.env.example geolock/settings.env
+nano geolock/settings.env   # set GEOLOCK_ENABLED=1
+sudo ./scripts/geolock-apply.sh
 ```
 
-UI: `http://127.0.0.1:3000` (Grafana), `http://127.0.0.1:9090` (Prometheus). Not published off-box.
+Your house LAN is always allowed so you cannot lock yourself out.
 
-## Architecture reminders
+## Things that do **not** have a login
 
-```
-LAN clients → Pi-hole :53 → Unbound → dnscrypt-proxy → internet
-                ↑
-         blocklists / rate limit
+- **Unbound** — checks DNS answers. No page.
+- **dnscrypt** — encrypts lookups. No page.
+- **GitHub** — you only downloaded files.
+- **Docker** — it runs the boxes. You can skip creating a Docker Hub user.
 
-Admin → 127.0.0.1:80 → (optional) Tailscale Serve HTTPS
-```
+## Don’t
 
-- FTL upstream must stay `unbound` only — do not add `1.1.1.1` there or ads bypass the chain.
-- FTL DNSSEC off when Unbound already validates.
-- Rate limit aggressive clients (`1000/60` is a reasonable starting point).
+- Don’t add `1.1.1.1` as a Pi-hole upstream. Ads will sneak around the blocker.
+- Don’t port-forward 53, 80, or 443 on the router to this PC.
+- Don’t commit `.env` or `unbound/tls.key` to git.
 
-## Hardening checklist
+## Start it again later
 
-- [ ] No `0.0.0.0` / `[::]` on DNS or admin publishes
-- [ ] `.env` mode `600`, never committed
-- [ ] `unbound/tls.key` mode `600`, never committed
-- [ ] UFW (or nftables) allows `:53` from LAN only
-- [ ] Admin not port-forwarded on the router
-- [ ] Host DNS is `127.0.0.1`, LAN clients use `LAN_IPV4`
-
-## Firefox note
-
-On the Pi-hole host, use `http://127.0.0.1/admin/`.  
-`http://pi.hole` often resolves to the **container** bridge IP, which does not serve the published admin ports. Pin in `/etc/hosts` if you want the pretty name:
-
-```
-127.0.0.1 pi.hole pihole.lan
+```bash
+cd home-dns
+./install.sh
 ```

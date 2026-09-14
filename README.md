@@ -1,56 +1,80 @@
-# Home DNS stack
+# Home DNS
 
-Reproducible **Pi-hole + Unbound + dnscrypt-proxy** (Docker Compose), with optional Prometheus/Grafana and Tailscale Serve for the admin UI.
+This turns one computer into ad-blocking DNS for your house.
 
-Secrets, live gravity DB, private keys, and host identifiers are **not** included — use `.env.example` and `scripts/gen-dot-cert.sh`.
+Phones, TVs, and laptops ask this computer “where is that website?”  
+Pi-hole blocks ads. Unbound and dnscrypt fetch the real answers privately.
 
-**Linux**
+You do **not** sign into GitHub or Docker to use this.  
+You **do** pick a Pi-hole password and type it in a web page. That is the main login.
+
+## Linux (one computer on your home network)
+
+1. Install [Docker](https://docs.docker.com/engine/install/).
+2. Open Terminal and run:
 
 ```bash
 git clone https://github.com/IAmXMob69/home-dns.git
 cd home-dns
-cp .env.example .env   # set LAN_IPV4 and passwords
+cp .env.example .env
+nano .env
+```
+
+3. In that file, set a **Pi-hole password** (`FTLCONF_webserver_api_password`) and this PC’s **home IP** (`LAN_IPV4`). Save. Exit.
+4. Run:
+
+```bash
 ./install.sh
 ```
 
-**Windows** (Docker Desktop)
+5. Sign into Pi-hole: on **this same computer**, open a browser to  
+   **http://127.0.0.1/admin/**  
+   Username is not used. Type the password from step 3.
+
+Full walkthrough: [SETUP.md](./SETUP.md)
+
+## Windows (one computer on your home network)
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and start it. Wait until it says it is running. You do **not** need a Docker account.
+2. Open PowerShell and run:
 
 ```powershell
 git clone https://github.com/IAmXMob69/home-dns.git
 cd home-dns
-copy .env.example .env   # set LAN_IPV4 and passwords
+copy .env.example .env
+notepad .env
+```
+
+3. Same as Linux: set the **Pi-hole password** and this PC’s **home IP**. Save. Close Notepad.
+4. Run:
+
+```powershell
 .\install.ps1
 ```
 
-## Quick path
+5. Sign into Pi-hole: on **this same computer**, open a browser to  
+   **http://127.0.0.1/admin/**  
+   Type the password you put in `.env`.
 
-```
-LAN clients → Pi-hole (block) → Unbound (DNSSEC / DoT) → dnscrypt-proxy (anonymized) → internet
-```
+Full walkthrough: [SETUP-windows.md](./SETUP-windows.md)
 
-**Full install:** [SETUP.md](./SETUP.md) (Linux) or [SETUP-windows.md](./SETUP-windows.md) (Windows).
+## How you sign in (each piece)
 
-## Layout
+| Thing | Do you sign in? | How |
+|------|------------------|-----|
+| **GitHub** (download) | No | Public clone. No account needed. |
+| **Docker** | No | Just install and start it. Skip “Sign in” if it asks. |
+| **Pi-hole** (ad blocker page) | **Yes — this is the one that matters** | Browser: http://127.0.0.1/admin/ — password from `.env` (`FTLCONF_webserver_api_password`). |
+| **Unbound** | No | Works in the background. |
+| **dnscrypt** | No | Works in the background. |
+| **Grafana** (graphs, optional) | Yes, only if you turn graphs on | Browser: http://127.0.0.1:3000 — user `admin` — password from `.env` (`GRAFANA_ADMIN_PASSWORD`). |
+| **Tailscale** (see the page from your phone, optional) | Yes, only if you install Tailscale | App or https://login.tailscale.com — Google / Microsoft / GitHub / email. Then open the Pi-hole link Tailscale gives you. Still use the **Pi-hole** password on that page. |
+| **Geo-lock** (Linux only, optional) | No | A firewall setting. No website login. |
 
-| Path | What |
-|------|------|
-| `docker-compose.yml` | dnscrypt, unbound, pihole, optional monitoring |
-| `docker-compose.tailscale.yml` | overlay for Tailscale host records |
-| `dnscrypt/dnscrypt-proxy.toml` | anonymized upstream resolvers |
-| `unbound/custom.conf.d/hardening.conf` | access-control, qname-min, forward to dnscrypt |
-| `monitoring/` | exporter + Prometheus + Grafana provisioning |
-| `.env.example` | all required env vars (copy to `.env`) |
-| `scripts/gen-dot-cert.sh` | local DoT certificate |
-| `install.sh` | Linux: CA bundle + cert + `docker compose up` |
-| `install.ps1` | Windows: same steps for Docker Desktop |
-| `geolock/` | optional country gate (off until `settings.env` + `sudo ./scripts/geolock-apply.sh`) |
+Do not put `1.1.1.1` into Pi-hole’s DNS servers. That skips the blocker.
 
-## Security
-
-- Admin UI binds to loopback only; use Tailscale Serve (or SSH tunnel) for remote access.
-- DNS publishes on your LAN IPv4 only — never wholesale `0.0.0.0`/`[::]` on a dual-stack host.
-- Do not commit `.env`, `unbound/tls.key`, or `etc-pihole/` runtime data.
+Do not open port 53 to the whole internet.
 
 ## License
 
-Configs here are provided as-is for personal reuse. Pi-hole, Unbound, and dnscrypt-proxy remain under their own licenses.
+Configs are as-is for personal reuse. Pi-hole, Unbound, and dnscrypt-proxy keep their own licenses.
