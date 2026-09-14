@@ -1,11 +1,16 @@
-# Starter set — import in Pi-hole UI or copy ideas into your own gravity.
-# These are public lists; enable what you need, then run gravity.
-https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
-https://small.oisd.nl/
-https://v.firebog.net/hosts/AdguardDNS.txt
-https://v.firebog.net/hosts/Easylist.txt
-https://v.firebog.net/hosts/Prigent-Malware.txt
-https://adaway.org/hosts.txt
-https://raw.githubusercontent.com/crazy-max/WindowsSpyBlocker/master/data/hosts/spy.txt
-https://raw.githubusercontent.com/Perflyst/PiHoleBlocklist/master/android-tracking.txt
-https://malware-filter.gitlab.io/malware-filter/urlhaus-filter-dnscrypt-blocked-names.txt
+# Slim set used on a live Pi-hole (7 lists, ~1.3M unique domains).
+# Import in Pi-hole → Adlists, or feed these URLs into gravity.
+# Do not stack giant overlapping Firebog / blocklistproject dumps on top.
+
+# Malware / phishing
+https://phishing.army/download/phishing_army_blocklist_extended.txt
+https://malware-filter.gitlab.io/malware-filter/urlhaus-filter-domains-online.txt
+
+# Ads / trackers
+https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.txt
+https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/tif.medium.txt
+https://big.oisd.nl/
+
+# Extra coverage
+https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn/hosts
+https://raw.githubusercontent.com/kboghdady/youTube_ads_4_pi-hole/master/youtubelist.txt

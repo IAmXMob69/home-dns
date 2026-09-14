@@ -151,6 +151,8 @@ After the stack is running:
 ./scripts/geolock-pihole.sh
 ```
 
+Adlists: use the slim set in `blocklists/adlists.example` (7 lists). Do not paste huge overlapping Firebog dumps back in.
+
 Then sign into **http://127.0.0.1/admin/** (Pi-hole password) → **Group management** → **Groups**.
 
 - **Geo-Location Lock** On = block India, Africa, Israel, and Saudi names  
