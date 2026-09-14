@@ -14,13 +14,16 @@ x-logging: &default-logging
 services:
   dnscrypt:
     container_name: dnscrypt
-    image: klutchell/dnscrypt-proxy:latest
+    image: klutchell/dnscrypt-proxy:2.1.5
     hostname: dnscrypt
     networks:
       default:
         ipv4_address: 172.30.90.2
     restart: unless-stopped
     cpu_shares: 1024
+    cpus: 0.5
+    mem_limit: 256m
+    mem_reservation: 128m
     logging: *default-logging
     volumes:
       - ./dnscrypt/dnscrypt-proxy.toml:/config/dnscrypt-proxy.toml:ro
@@ -33,11 +36,11 @@ services:
       interval: 30s
       timeout: 15s
       retries: 5
-      start_period: 90s
+      start_period: 120s
 
   unbound:
     container_name: unbound
-    image: klutchell/unbound:latest
+    image: klutchell/unbound:1.20.0
     hostname: unbound
     depends_on:
       dnscrypt:
@@ -45,6 +48,9 @@ services:
     restart: unless-stopped
     user: "101:102"
     cpu_shares: 2048
+    cpus: 1.0
+    mem_limit: 512m
+    mem_reservation: 256m
     logging: *default-logging
     ports:
       # LAN DNS-over-TLS (Private DNS / DoT clients). Never 0.0.0.0.
@@ -61,7 +67,7 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-      start_period: 45s
+      start_period: 60s
 
   pihole:
     container_name: pihole
@@ -75,7 +81,7 @@ services:
       - "127.0.0.1:53:53/udp"
       - "${LAN_IPV4}:53:53/tcp"
       - "${LAN_IPV4}:53:53/udp"
-      # Optional LAN IPv6 (EUI-64 only). Never [::].
+      # Optional LAN IPv6 (EUI-64 only). Never [::]
       # Uncomment and set LAN_IPV6 in .env if you need IPv6 DNS on the LAN:
       # - "[${LAN_IPV6}]:53:53/tcp"
       # - "[${LAN_IPV6}]:53:53/udp"
@@ -102,8 +108,8 @@ services:
       FTLCONF_dns_rateLimit_count: "1000"
       FTLCONF_dns_rateLimit_interval: "60"
       FTLCONF_dns_EDNS0ECS: "false"
-      FTLCONF_dns_blocking_mode: NULL
-      FTLCONF_dns_blocking_edns: CODE
+      FTLCONF_dns_blocking_mode: "NULL"
+      FTLCONF_dns_blocking_edns: "CODE"
       # CNAME inspect was sinking Facebook graph/gateway via star.c10r CNAME chains.
       FTLCONF_dns_CNAMEdeepInspect: "false"
       FTLCONF_dns_blockESNI: "true"
@@ -139,6 +145,9 @@ services:
       - NET_ADMIN
       - SYS_NICE
     cpu_shares: 2048
+    cpus: 1.5
+    mem_limit: 1g
+    mem_reservation: 512m
     restart: unless-stopped
     # Container bootstrap only. FTL upstream is Unbound, not these.
     dns:
@@ -150,7 +159,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 20s
+      start_period: 45s
 
   # Optional: docker compose --profile monitoring up -d
   pihole-exporter:
@@ -170,6 +179,9 @@ services:
     ports:
       - "127.0.0.1:9617:9617"
     cpu_shares: 128
+    cpus: 0.25
+    mem_limit: 256m
+    mem_reservation: 128m
     restart: unless-stopped
     logging: *default-logging
     depends_on:
@@ -179,7 +191,7 @@ services:
   prometheus:
     profiles: ["monitoring"]
     container_name: prometheus
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.48.0
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -191,7 +203,8 @@ services:
       - "127.0.0.1:9090:9090"
     cpu_shares: 256
     cpus: 0.5
-    mem_limit: 384m
+    mem_limit: 1g
+    mem_reservation: 512m
     restart: unless-stopped
     logging: *default-logging
     depends_on:
@@ -200,7 +213,7 @@ services:
   grafana:
     profiles: ["monitoring"]
     container_name: grafana
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.0.0
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
@@ -218,7 +231,8 @@ services:
       - "127.0.0.1:3000:3000"
     cpu_shares: 256
     cpus: 0.5
-    mem_limit: 512m
+    mem_limit: 768m
+    mem_reservation: 384m
     restart: unless-stopped
     logging: *default-logging
     depends_on:

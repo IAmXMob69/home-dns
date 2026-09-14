@@ -1,0 +1,7 @@
+# home-dns Code Owners
+* @IAmXMob69
+
+# Configuration owners
+docker-compose*.yml @IAmXMob69
+.env.example @IAmXMob69
+README.md @IAmXMob69
