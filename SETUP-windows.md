@@ -131,6 +131,8 @@ Git Bash or WSL:
 
 Then **http://127.0.0.1/admin/** → sign in with the Pi-hole password → **Group management** → **Groups** → **Geo-Location Lock** on/off.
 
+On = India, rest of South Asia, Africa (including Nigeria), Israel, and Saudi names.
+
 The extra country firewall script is Linux-only. On Windows, use the firewall rules above.
 
 ## Things that do **not** have a login
