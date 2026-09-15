@@ -1,0 +1,101 @@
+# Pi-hole privacy shield / data collection halt
+# Format: TYPE<TAB>RULE<TAB>COMMENT
+# TYPE 1 = exact deny, TYPE 3 = regex deny.
+#
+# These are local, high-signal deny rules for telemetry, analytics, crash
+# reporting, diagnostics upload, attribution, and device tracking endpoints.
+# They complement public adlists and survive gravity updates because they are
+# inserted into Pi-hole's domainlist table.
+3	(^|\.)telemetry\.mozilla\.org$	Firefox telemetry
+3	(^|\.)incoming\.telemetry\.mozilla\.org$	Firefox telemetry ingest
+3	(^|\.)data\.mozilla\.com$	Mozilla telemetry data collection
+3	(^|\.)firefox\.settings\.services\.mozilla\.com$	Firefox remote settings telemetry surface
+3	(^|\.)normandy\.cdn\.mozilla\.net$	Firefox studies/remote experiments
+3	(^|\.)vortex\.data\.microsoft\.com$	Windows telemetry
+3	(^|\.)settings-win\.data\.microsoft\.com$	Windows telemetry settings
+3	(^|\.)watson\.telemetry\.microsoft\.com$	Microsoft crash telemetry
+3	(^|\.)oca\.telemetry\.microsoft\.com$	Microsoft crash telemetry
+3	(^|\.)sqm\.telemetry\.microsoft\.com$	Microsoft customer experience telemetry
+3	(^|\.)telemetry\.microsoft\.com$	Microsoft telemetry
+3	(^|\.)diagnostics\.support\.microsoft\.com$	Microsoft diagnostics upload
+3	(^|\.)officeclient\.microsoft\.com$	Microsoft Office client telemetry
+3	(^|\.)browser\.events\.data\.microsoft\.com$	Microsoft browser event telemetry
+3	(^|\.)self\.events\.data\.microsoft\.com$	Microsoft event telemetry
+3	(^|\.)mobile\.events\.data\.microsoft\.com$	Microsoft mobile event telemetry
+3	(^|\.)events\.data\.microsoft\.com$	Microsoft event telemetry
+3	(^|\.)activity\.windows\.com$	Windows activity history sync
+3	(^|\.)settings\.data\.microsoft\.com$	Microsoft settings telemetry
+3	(^|\.)watson\.events\.data\.microsoft\.com$	Microsoft Watson events
+3	(^|\.)telemetry\.dropbox\.com$	Dropbox telemetry
+3	(^|\.)clientstats\.dropbox\.com$	Dropbox client stats
+3	(^|\.)logs\.dropbox\.com$	Dropbox diagnostics
+3	(^|\.)stats\.g\.doubleclick\.net$	Google advertising measurement
+3	(^|\.)www\.google-analytics\.com$	Google Analytics
+3	(^|\.)ssl\.google-analytics\.com$	Google Analytics
+3	(^|\.)analytics\.google\.com$	Google Analytics
+3	(^|\.)region1\.google-analytics\.com$	Google Analytics regional ingest
+3	(^|\.)region1\.analytics\.google\.com$	Google Analytics regional ingest
+3	(^|\.)www\.googletagmanager\.com$	Google Tag Manager
+3	(^|\.)googletagmanager\.com$	Google Tag Manager
+3	(^|\.)firebase-settings\.crashlytics\.com$	Crashlytics settings
+3	(^|\.)reports\.crashlytics\.com$	Crashlytics reports
+3	(^|\.)crashlyticsreports-pa\.googleapis\.com$	Crashlytics reports
+3	(^|\.)firebaseinstallations\.googleapis\.com$	Firebase installation identifiers
+3	(^|\.)app-measurement\.com$	Google/Firebase app measurement
+3	(^|\.)app-measurement\.com\.cn$	Google/Firebase app measurement
+3	(^|\.)firebase-settings\.crashlytics\.com\.cn$	Crashlytics settings
+3	(^|\.)graph\.facebook\.com$	Meta graph/event collection
+3	(^|\.)graph\.instagram\.com$	Instagram graph/event collection
+3	(^|\.)connect\.facebook\.net$	Meta tracking pixel/scripts
+3	(^|\.)pixel\.facebook\.com$	Meta pixel
+3	(^|\.)analytics\.tiktok\.com$	TikTok analytics
+3	(^|\.)business-api\.tiktok\.com$	TikTok ad/event API
+3	(^|\.)log\.tiktokv\.com$	TikTok logging
+3	(^|\.)mon\.tiktokv\.com$	TikTok monitoring
+3	(^|\.)analytics\.twitter\.com$	X/Twitter analytics
+3	(^|\.)ads-api\.twitter\.com$	X/Twitter ad API
+3	(^|\.)ads\.linkedin\.com$	LinkedIn ads/tracking
+3	(^|\.)px\.ads\.linkedin\.com$	LinkedIn pixel
+3	(^|\.)analytics\.spotify\.com$	Spotify analytics
+3	(^|\.)log-upload\.spotify\.com$	Spotify log upload
+3	(^|\.)adeventtracker\.spotify\.com$	Spotify ad event tracking
+3	(^|\.)tracking\.spotify\.com$	Spotify tracking
+3	(^|\.)telemetry\.discord\.com$	Discord telemetry
+3	(^|\.)sentry\.io$	Sentry crash/event telemetry
+3	(^|\.)ingest\.sentry\.io$	Sentry ingest
+3	(^|\.)o[0-9]+\.ingest\.sentry\.io$	Sentry project ingest
+3	(^|\.)sessions\.bugsnag\.com$	Bugsnag session tracking
+3	(^|\.)notify\.bugsnag\.com$	Bugsnag crash reports
+3	(^|\.)api\.amplitude\.com$	Amplitude analytics
+3	(^|\.)api2\.amplitude\.com$	Amplitude analytics
+3	(^|\.)cdn\.amplitude\.com$	Amplitude scripts
+3	(^|\.)api\.segment\.io$	Segment analytics
+3	(^|\.)cdn\.segment\.com$	Segment scripts
+3	(^|\.)api-js\.mixpanel\.com$	Mixpanel analytics
+3	(^|\.)api\.mixpanel\.com$	Mixpanel analytics
+3	(^|\.)events\.mixpanel\.com$	Mixpanel events
+3	(^|\.)api\.heap-api\.com$	Heap analytics
+3	(^|\.)heapanalytics\.com$	Heap analytics
+3	(^|\.)rs\.fullstory\.com$	FullStory session replay
+3	(^|\.)fullstory\.com$	FullStory session replay
+3	(^|\.)logrocket\.com$	LogRocket session replay
+3	(^|\.)cdn\.logrocket\.io$	LogRocket scripts
+3	(^|\.)api\.logrocket\.com$	LogRocket ingest
+3	(^|\.)hotjar\.com$	Hotjar session analytics
+3	(^|\.)static\.hotjar\.com$	Hotjar scripts
+3	(^|\.)script\.hotjar\.com$	Hotjar scripts
+3	(^|\.)in\.hotjar\.com$	Hotjar ingest
+3	(^|\.)clarity\.ms$	Microsoft Clarity analytics
+3	(^|\.)www\.clarity\.ms$	Microsoft Clarity analytics
+3	(^|\.)bat\.bing\.com$	Microsoft/Bing ads tracking
+3	(^|\.)browser-intake-datadoghq\.com$	Datadog browser telemetry
+3	(^|\.)rum\.browser-intake-datadoghq\.com$	Datadog RUM telemetry
+3	(^|\.)logs\.browser-intake-datadoghq\.com$	Datadog log ingest
+3	(^|\.)newrelic\.com$	New Relic telemetry
+3	(^|\.)bam\.nr-data\.net$	New Relic browser telemetry
+3	(^|\.)js-agent\.newrelic\.com$	New Relic browser agent
+3	(^|\.)plausible\.io$	Plausible analytics
+3	(^|\.)analytics\.plausible\.io$	Plausible analytics
+3	(^|\.)matomo\.cloud$	Matomo analytics
+3	(^|\.)stats\.wp\.com$	WordPress/Automattic stats
+3	(^|\.)pixel\.wp\.com$	WordPress/Automattic pixel

@@ -70,6 +70,7 @@ Full walkthrough: [SETUP-windows.md](./SETUP-windows.md)
 | **Grafana** (graphs, optional) | Yes, only if you turn graphs on | Browser: http://127.0.0.1:3000 — user `admin` — password from `.env` (`GRAFANA_ADMIN_PASSWORD`). |
 | **Tailscale** (see the page from your phone, optional) | Yes, only if you install Tailscale | App or https://login.tailscale.com — Google / Microsoft / GitHub / email. Then open the Pi-hole link Tailscale gives you. Still use the **Pi-hole** password on that page. |
 | **Geo-lock** (optional) | No | In Pi-hole: **Group management → Groups → Geo-Location Lock** (on/off). Extra Linux firewall: `sudo ./scripts/geolock-apply.sh`. |
+| **Data collection halt** | No | In Pi-hole: **Group management → Groups → Data collection halt**. Extra Linux IP drop: `sudo ./scripts/malice-ip-apply.sh`. |
 
 ## Geo-Location Lock (in Pi-hole)
 
@@ -86,6 +87,23 @@ On = block India, rest of South Asia, Africa (including Nigeria), Israel, and Sa
 Do not put `1.1.1.1` into Pi-hole’s DNS servers. That skips the blocker.
 
 Do not open port 53 to the whole internet.
+
+
+## Data collection halt (in Pi-hole)
+
+Blocks telemetry and tracker names (Mozilla, Microsoft, analytics, crash reporters).
+
+```bash
+./scripts/privacy-shield-pihole.sh
+```
+
+Then http://127.0.0.1/admin/ → **Group management** → **Groups** → **Data collection halt**.
+
+Known-bad IPs (FireHOL level1), Linux only:
+
+```bash
+sudo ./scripts/malice-ip-apply.sh
+```
 
 ## License
 
