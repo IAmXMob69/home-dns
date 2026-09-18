@@ -24,7 +24,7 @@ now = int(time.time())
 cur.execute('SELECT id FROM "group" WHERE name=?', ("Geo-Location Lock",))
 row = cur.fetchone()
 desc = (
-    "On = block India, rest of South Asia, Africa (incl. Nigeria), Israel, and Saudi names (ccTLDs and major sites). "
+    "On = US-centric lock: Africa (all ccTLDs incl. Nigeria), India, South Asia, Malaysia, Israel, Saudi. "
     "Off = those sites work again. Use this switch; do not delete the domains."
 )
 if row:
@@ -72,6 +72,7 @@ files = {
     "domains-saudi.txt": "Geo lock Saudi domain",
     "domains-southasia.txt": "Geo lock South Asia domain",
     "domains-nigeria.txt": "Geo lock Nigeria domain",
+    "domains-malaysia.txt": "Geo lock Malaysia domain",
 }
 for fn, comment in files.items():
     p = lists / fn

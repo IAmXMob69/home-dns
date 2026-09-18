@@ -1,10 +1,129 @@
-# Indian ccTLD (covers .co.in, .gov.in, ...)
+# One regex per ccTLD so Pi-hole actually matches. US-centric Geo-Location Lock.
+# Geo lock Africa Algeria ccTLD
+(^|\.)dz$
+# Geo lock Africa Angola ccTLD
+(^|\.)ao$
+# Geo lock Africa Benin ccTLD
+(^|\.)bj$
+# Geo lock Africa Botswana ccTLD
+(^|\.)bw$
+# Geo lock Africa Burkina Faso ccTLD
+(^|\.)bf$
+# Geo lock Africa Burundi ccTLD
+(^|\.)bi$
+# Geo lock Africa CAR ccTLD
+(^|\.)cf$
+# Geo lock Africa Cabo Verde ccTLD
+(^|\.)cv$
+# Geo lock Africa Cameroon ccTLD
+(^|\.)cm$
+# Geo lock Africa Chad ccTLD
+(^|\.)td$
+# Geo lock Africa Comoros ccTLD
+(^|\.)km$
+# Geo lock Africa Congo ccTLD
+(^|\.)cg$
+# Geo lock Africa DR Congo ccTLD
+(^|\.)cd$
+# Geo lock Africa Djibouti ccTLD
+(^|\.)dj$
+# Geo lock Africa Egypt ccTLD
+(^|\.)eg$
+# Geo lock Africa Equatorial Guinea ccTLD
+(^|\.)gq$
+# Geo lock Africa Eritrea ccTLD
+(^|\.)er$
+# Geo lock Africa Eswatini ccTLD
+(^|\.)sz$
+# Geo lock Africa Ethiopia ccTLD
+(^|\.)et$
+# Geo lock Africa Gabon ccTLD
+(^|\.)ga$
+# Geo lock Africa Gambia ccTLD
+(^|\.)gm$
+# Geo lock Africa Ghana ccTLD
+(^|\.)gh$
+# Geo lock Africa Guinea ccTLD
+(^|\.)gn$
+# Geo lock Africa Guinea-Bissau ccTLD
+(^|\.)gw$
+# Geo lock Africa Ivory Coast ccTLD
+(^|\.)ci$
+# Geo lock Africa Kenya ccTLD
+(^|\.)ke$
+# Geo lock Africa Lesotho ccTLD
+(^|\.)ls$
+# Geo lock Africa Liberia ccTLD
+(^|\.)lr$
+# Geo lock Africa Libya ccTLD
+(^|\.)ly$
+# Geo lock Africa Madagascar ccTLD
+(^|\.)mg$
+# Geo lock Africa Malawi ccTLD
+(^|\.)mw$
+# Geo lock Africa Mali ccTLD
+(^|\.)ml$
+# Geo lock Africa Mauritania ccTLD
+(^|\.)mr$
+# Geo lock Africa Mauritius ccTLD
+(^|\.)mu$
+# Geo lock Africa Mayotte ccTLD
+(^|\.)yt$
+# Geo lock Africa Morocco ccTLD
+(^|\.)ma$
+# Geo lock Africa Mozambique ccTLD
+(^|\.)mz$
+# Geo lock Africa Namibia ccTLD
+(^|\.)na$
+# Geo lock Africa Niger ccTLD
+(^|\.)ne$
+# Geo lock Africa Nigeria ccTLD
+(^|\.)ng$
+# Geo lock Africa Reunion ccTLD
+(^|\.)re$
+# Geo lock Africa Rwanda ccTLD
+(^|\.)rw$
+# Geo lock Africa Sao Tome ccTLD
+(^|\.)st$
+# Geo lock Africa Senegal ccTLD
+(^|\.)sn$
+# Geo lock Africa Seychelles ccTLD
+(^|\.)sc$
+# Geo lock Africa Sierra Leone ccTLD
+(^|\.)sl$
+# Geo lock Africa Somalia ccTLD
+(^|\.)so$
+# Geo lock Africa South Africa ccTLD
+(^|\.)za$
+# Geo lock Africa South Sudan ccTLD
+(^|\.)ss$
+# Geo lock Africa St Helena ccTLD
+(^|\.)sh$
+# Geo lock Africa Sudan ccTLD
+(^|\.)sd$
+# Geo lock Africa TLD ccTLD
+(^|\.)africa$
+# Geo lock Africa Tanzania ccTLD
+(^|\.)tz$
+# Geo lock Africa Togo ccTLD
+(^|\.)tg$
+# Geo lock Africa Tunisia ccTLD
+(^|\.)tn$
+# Geo lock Africa Uganda ccTLD
+(^|\.)ug$
+# Geo lock Africa Western Sahara ccTLD
+(^|\.)eh$
+# Geo lock Africa Zambia ccTLD
+(^|\.)zm$
+# Geo lock Africa Zimbabwe ccTLD
+(^|\.)zw$
+# Geo lock Indian ccTLD
 (^|\.)in$
-# Israel
+# Geo lock Israel ccTLD
 (^|\.)il$
-# Saudi Arabia
+# Geo lock Malaysia ccTLD
+(^|\.)my$
+# Geo lock Saudi ccTLD
 (^|\.)sa$
-# Africa
-(^|\.)(za|ng|ke|eg|gh|tz|ug|ma|dz|tn|et|ci|sn|cm|ao|mz|zw|zm|rw|sd|ly|mg|mw|ml|bf|ne|td|so|ss|bi|bj|bw|cf|cg|cv|dj|er|ga|gm|gn|gq|gw|km|lr|ls|mr|mu|na|sc|sl|st|sz|tg|cd|re)$
-# South Asia (PK BD LK NP BT MV AF; IN is above)
+# Geo lock South Asia ccTLD
 (^|\.)(pk|bd|lk|np|bt|mv|af)$
