@@ -97,8 +97,9 @@
 (^|\.)za$
 # Geo lock Africa South Sudan ccTLD
 (^|\.)ss$
-# Geo lock Africa St Helena ccTLD
-(^|\.)sh$
+# .sh (Saint Helena) omitted on purpose: generic TLD used by bun.sh,
+# charm.sh, ohmyz.sh and similar — not Saint Helena content. Re-adding
+# (^|\.)sh$ sinkholes those names.
 # Geo lock Africa Sudan ccTLD
 (^|\.)sd$
 # Geo lock Africa TLD ccTLD
