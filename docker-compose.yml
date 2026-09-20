@@ -134,11 +134,11 @@ services:
       FTLCONF_ntp_sync_active: "false"
       FTLCONF_ntp_ipv4_active: "false"
       FTLCONF_ntp_ipv6_active: "false"
-      # Max CPU priority for DNS under desktop load (needs SYS_NICE).
-      FTLCONF_misc_nice: "-20"
+      # Fair scheduler share. -20 starved Grok Bot / XFCE on this 4-core box.
+      FTLCONF_misc_nice: "0"
       # Admin UI is loopback/Tailscale Serve only; cut CivetWeb thread pool.
-      FTLCONF_webserver_threads: "10"
-      FTLCONF_misc_check_load: "false"
+      FTLCONF_webserver_threads: "6"
+      FTLCONF_misc_check_load: "true"
     volumes:
       - ./etc-pihole:/etc/pihole
     cap_add:
