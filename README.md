@@ -84,6 +84,8 @@ Then http://127.0.0.1/admin/ → sign in with the Pi-hole password → **Group m
 
 On = US-centric lock: Africa (every African ccTLD, including Nigeria), India, rest of South Asia, Malaysia, Israel, Saudi. Off = those names work. Do not delete the list; use the switch.
 
+The script uses the Pi-hole password from `.env`. It only changes its own entries (comment starts with `Geo lock`). Your allowlist is never touched. Add `--dry-run` to preview.
+
 Do not put `1.1.1.1` into Pi-hole’s DNS servers. That skips the blocker.
 
 Do not open port 53 to the whole internet.
@@ -98,6 +100,8 @@ Blocks telemetry and tracker names (Mozilla, Microsoft, analytics, crash reporte
 ```
 
 Then http://127.0.0.1/admin/ → **Group management** → **Groups** → **Data collection halt**.
+
+Same rules as Geo-Location Lock: own entries only (`privacy-shield:`), `--dry-run` to preview.
 
 Known-bad IPs (FireHOL level1), Linux only:
 
