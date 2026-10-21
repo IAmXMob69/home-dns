@@ -33,7 +33,18 @@ if [[ ! -f unbound/tls.pem || ! -f unbound/tls.key ]]; then
   chmod +x scripts/gen-dot-cert.sh
   ./scripts/gen-dot-cert.sh pihole.lan
 fi
-chmod 644 unbound/tls.key unbound/tls.pem
+chmod 644 unbound/tls.pem
+
+# The DoT key stays 0600 and is owned by Unbound's uid (101:102) so only
+# Unbound can read it. Docker does the chown, so no sudo is needed.
+fix_key_owner() {
+  if [[ "$(stat -c '%u:%g %a' unbound/tls.key)" == "101:102 600" ]]; then
+    return 0
+  fi
+  docker run --rm --network none -v "$ROOT/unbound:/u" busybox:stable \
+    sh -c 'chown 101:102 /u/tls.key && chmod 600 /u/tls.key'
+}
+fix_key_owner
 
 mkdir -p etc-pihole
 chmod +x scripts/*.sh install.sh
