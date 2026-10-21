@@ -7,6 +7,8 @@ Never writes gravity.db directly. Rules:
   updated, and ours that are no longer in the source lists get deleted.
 - A deny entry the user added by hand (other comment) is left alone.
 - The group's on/off switch is kept as the user left it.
+- Ours live only in this group (not Default), so the switch really
+  turns them off. Their existing comments are kept.
 
 Password: PIHOLE_PASSWORD, else FTLCONF_webserver_api_password from .env.
 """
@@ -125,8 +127,9 @@ def sync(api, group, desc, tag, desired, dry=False, prune=True):
             to_add.setdefault((key[0], comment), []).append(key[1])
         elif not (have.get("comment") or "").startswith(tag):
             skipped.append(key)
-        elif have.get("comment") != comment or sorted(have.get("groups") or []) != [gid]:
-            to_fix.append((key, comment, have))
+        elif sorted(have.get("groups") or []) != [gid]:
+            # Keep an owned entry's existing comment (may be more specific).
+            to_fix.append((key, have.get("comment") or comment, have))
     stale = [d for key, d in deny.items()
              if (d.get("comment") or "").startswith(tag) and key not in desired]
 

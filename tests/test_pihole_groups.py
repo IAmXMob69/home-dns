@@ -19,6 +19,8 @@ LIST = ROOT / "geolock/pihole/domains-india.txt"
 first_two = [ln.strip().lower() for ln in LIST.read_text().splitlines()
              if ln.strip() and not ln.startswith("#")][:2]
 ALLOWED, HAND_DENY = first_two
+first_two_regex = next(ln.strip() for ln in (ROOT / "geolock/pihole/regex.txt").read_text().splitlines()
+                       if ln.strip() and not ln.startswith("#"))
 
 DB = {
     "groups": [{"id": 0, "name": "Default", "comment": "", "enabled": True},
@@ -30,6 +32,8 @@ DB = {
          "groups": [0], "enabled": True},
         {"id": 3, "domain": "removed.example.in", "type": "deny", "kind": "exact",
          "comment": "Geo lock India domain", "groups": [1], "enabled": True},
+        {"id": 4, "domain": first_two_regex, "type": "deny", "kind": "regex",
+         "comment": "Geo lock Indian ccTLD", "groups": [0, 1], "enabled": True},
     ],
     "clients": [{"id": 1, "client": "192.168.0.0/16", "comment": "LAN", "groups": [0]}],
 }
@@ -158,6 +162,9 @@ def main():
     owned = [x for x in DB["domains"] if (x["comment"] or "").startswith("Geo lock ")]
     if not owned or any(x["groups"] != [geo["id"]] for x in owned):
         problems.append("owned entries not in the Geo-Location Lock group")
+    rx = next(x for x in DB["domains"] if x["domain"] == first_two_regex and x["type"] == "deny")
+    if rx["comment"] != "Geo lock Indian ccTLD" or rx["groups"] != [geo["id"]]:
+        problems.append("owned entry: comment not kept or still in Default group")
     lan = next(c for c in DB["clients"] if c["client"] == "192.168.0.0/16")
     if set(lan["groups"]) != {0, geo["id"]} or lan["comment"] != "LAN":
         problems.append("existing client not merged into group correctly")
