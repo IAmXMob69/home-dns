@@ -15,6 +15,19 @@ PIHOLE_PROTOCOL = os.getenv("PIHOLE_PROTOCOL", "http")
 EXPORTER_PORT = int(os.getenv("EXPORTER_PORT", "9617"))
 FTL_DB_PATH = os.getenv("FTL_DB_PATH", "/etc/pihole/pihole-FTL.db")
 CACHE_TTL = 30
+TOP_N = 20
+
+# FTL query_status values that mean "blocked" (src/enums.h). Regex and
+# CNAME-chain blocks matter here: Geo-Location Lock is regex-based.
+BLOCKED_STATUS_IDS = (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16, 18)
+BLOCKED_STATUS_NAMES = {
+    "GRAVITY", "REGEX", "DENYLIST",
+    "EXTERNAL_BLOCKED_IP", "EXTERNAL_BLOCKED_NULL", "EXTERNAL_BLOCKED_NXRA",
+    "EXTERNAL_BLOCKED_EDE15",
+    "GRAVITY_CNAME", "REGEX_CNAME", "DENYLIST_CNAME",
+    "DBBUSY", "SPECIAL_DOMAIN",
+}
+CACHED_STATUS_IDS = (3, 17)
 
 metrics_cache = {}
 per_client_metrics = {}
@@ -24,7 +37,10 @@ query_types = {}
 upstream_servers = {}
 top_permitted_domains = []
 top_blocked_domains = []
+pihole_up = 0.0
 session = requests.Session()
+# What a failed Pi-hole call can raise: network/HTTP errors and bad JSON shapes.
+API_ERRORS = (requests.RequestException, ValueError, KeyError, TypeError, AttributeError)
 
 
 def api_base():
@@ -46,7 +62,7 @@ def login():
             print("Authenticated to Pi-hole v6 API")
         else:
             print(f"Pi-hole auth failed: HTTP {r.status_code}")
-    except Exception as e:
+    except API_ERRORS as e:
         print(f"Pi-hole auth error: {e}")
 
 
@@ -66,14 +82,14 @@ def sqlite_scalar(query, default=0.0):
         row = con.execute(query).fetchone()
         con.close()
         return float(row[0] if row and row[0] is not None else default)
-    except Exception as e:
+    except (sqlite3.Error, ValueError, TypeError) as e:
         print(f"sqlite: {e}")
         return default
 
 
 def fetch_pihole_stats():
     global metrics_cache, per_client_metrics, top_domains, top_clients
-    global query_types, upstream_servers, top_permitted_domains, top_blocked_domains
+    global query_types, upstream_servers, top_permitted_domains, top_blocked_domains, pihole_up
     try:
         data = api_get("/api/stats/summary")
         queries = data.get("queries", {})
@@ -95,33 +111,43 @@ def fetch_pihole_stats():
             "gravity_domains": float(gravity.get("domains_being_blocked", 0)),
         }
         query_types = {k: float(v) for k, v in (queries.get("types") or {}).items()}
-    except Exception as e:
+        pihole_up = 1.0
+    except API_ERRORS as e:
         print(f"API summary failed, using sqlite fallback: {e}")
+        pihole_up = 0.0
+        since = "timestamp >= CAST(strftime('%s','now') AS INTEGER) - 86400"
+        blocked_ids = ",".join(str(x) for x in BLOCKED_STATUS_IDS)
+        cached_ids = ",".join(str(x) for x in CACHED_STATUS_IDS)
+        total = sqlite_scalar(f"SELECT COUNT(*) FROM query_storage WHERE {since}")
+        blocked = sqlite_scalar(f"SELECT COUNT(*) FROM query_storage WHERE {since} AND status IN ({blocked_ids})")
+        forwarded = sqlite_scalar(f"SELECT COUNT(*) FROM query_storage WHERE {since} AND status=2")
+        cached = sqlite_scalar(f"SELECT COUNT(*) FROM query_storage WHERE {since} AND status IN ({cached_ids})")
+        clients = sqlite_scalar(f"SELECT COUNT(DISTINCT client) FROM query_storage WHERE {since}")
         metrics_cache = {
-            "dns_queries_total": sqlite_scalar("SELECT COUNT(*) FROM query_storage"),
-            "dns_blocked_total": sqlite_scalar("SELECT COUNT(*) FROM query_storage WHERE status IN (1,4,5,6,7,8,9,10,11,15,16)"),
-            "dns_forwarded_total": sqlite_scalar("SELECT COUNT(*) FROM query_storage WHERE status=2"),
-            "dns_cached_total": sqlite_scalar("SELECT COUNT(*) FROM query_storage WHERE status=3"),
+            "dns_queries_total": total,
+            "dns_blocked_total": blocked,
+            "dns_forwarded_total": forwarded,
+            "dns_cached_total": cached,
             "clients_total": sqlite_scalar("SELECT COUNT(*) FROM client_by_id"),
             "devices_total": sqlite_scalar("SELECT COUNT(*) FROM client_by_id"),
-            "devices_active_24h": sqlite_scalar("SELECT COUNT(*) FROM client_by_id"),
-            "dns_queries_24h": sqlite_scalar("SELECT COUNT(*) FROM query_storage"),
-            "dns_blocked_24h": sqlite_scalar("SELECT COUNT(*) FROM query_storage WHERE status IN (1,4,5,6,7,8,9,10,11,15,16)"),
-            "dns_forwarded_24h": sqlite_scalar("SELECT COUNT(*) FROM query_storage WHERE status=2"),
-            "dns_cached_24h": sqlite_scalar("SELECT COUNT(*) FROM query_storage WHERE status=3"),
-            "clients_24h": sqlite_scalar("SELECT COUNT(*) FROM client_by_id"),
+            "devices_active_24h": clients,
+            "dns_queries_24h": total,
+            "dns_blocked_24h": blocked,
+            "dns_forwarded_24h": forwarded,
+            "dns_cached_24h": cached,
+            "clients_24h": clients,
             "gravity_domains": sqlite_scalar("SELECT value FROM counters WHERE id=0", 0),
         }
 
     try:
-        data = api_get("/api/stats/top_domains")
+        data = api_get(f"/api/stats/top_domains?count={TOP_N}")
         top_domains = []
         top_permitted_domains = []
         for item in data.get("domains", []):
             rec = {"domain": item.get("domain", "unknown"), "queries": float(item.get("count", 0)), "blocked": 0.0}
             top_domains.append(rec)
             top_permitted_domains.append({"domain": rec["domain"], "queries": rec["queries"]})
-    except Exception as e:
+    except API_ERRORS as e:
         print(f"top domains: {e}")
         top_domains, top_permitted_domains = [], []
 
@@ -133,30 +159,49 @@ def fetch_pihole_stats():
             count = float(item.get("count", 0))
             per_client_metrics[ip] = {"queries": count, "blocked": 0.0, "cached": 0.0, "forwarded": 0.0}
             top_clients.append({"mac": "", "name": item.get("name") or ip, "ip": ip, "queries": count})
-    except Exception as e:
+    except API_ERRORS as e:
         print(f"top clients: {e}")
         per_client_metrics, top_clients = {}, []
 
     try:
         data = api_get("/api/stats/upstreams")
         upstream_servers = {u.get("name") or u.get("ip", "unknown"): float(u.get("count", 0)) for u in data.get("upstreams", [])}
-    except Exception as e:
+    except API_ERRORS as e:
         print(f"upstreams: {e}")
         upstream_servers = {}
 
     try:
-        data = api_get("/api/queries?length=200")
-        blocked = {}
-        for q in data.get("queries", []):
-            status = str(q.get("status", ""))
-            if any(x in status.upper() for x in ("GRAVITY", "DENY", "BLOCK")):
-                d = q.get("domain", "unknown")
-                blocked[d] = blocked.get(d, 0) + 1
-        top_blocked_domains = [{"domain": d, "queries": float(c)} for d, c in sorted(blocked.items(), key=lambda x: -x[1])[:20]]
-    except Exception as e:
-        print(f"blocked: {e}")
-        top_blocked_domains = []
+        # FTL counts every blocked status here (gravity, regex, deny, CNAME, ...).
+        data = api_get(f"/api/stats/top_domains?blocked=true&count={TOP_N}")
+        top_blocked_domains = [
+            {"domain": item.get("domain", "unknown"), "queries": float(item.get("count", 0))}
+            for item in data.get("domains", [])
+        ]
+    except API_ERRORS as e:
+        print(f"top blocked domains: {e}; sampling recent queries")
+        top_blocked_domains = sample_blocked_queries()
     return True
+
+
+def is_blocked_status(status):
+    if isinstance(status, int):
+        return status in BLOCKED_STATUS_IDS
+    return str(status or "").upper() in BLOCKED_STATUS_NAMES
+
+
+def sample_blocked_queries():
+    try:
+        data = api_get("/api/queries?length=500")
+    except API_ERRORS as e:
+        print(f"blocked sample: {e}")
+        return []
+    blocked = {}
+    for q in data.get("queries", []):
+        if is_blocked_status(q.get("status")):
+            d = q.get("domain", "unknown")
+            blocked[d] = blocked.get(d, 0) + 1
+    top = sorted(blocked.items(), key=lambda x: -x[1])[:TOP_N]
+    return [{"domain": d, "queries": float(c)} for d, c in top]
 
 
 def escape_label_value(value):
@@ -165,46 +210,44 @@ def escape_label_value(value):
     return str(value).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
+def gauge(lines, name, help_text, value):
+    lines.append(f"# HELP {name} {help_text}")
+    lines.append(f"# TYPE {name} gauge")
+    lines.append(f"{name} {value}")
+
+
+def labeled(lines, name, help_text, label, items):
+    lines.append(f"# HELP {name} {help_text}")
+    lines.append(f"# TYPE {name} gauge")
+    for key, value in items:
+        lines.append(f'{name}{{{label}="{escape_label_value(key)}"}} {value}')
+
+
 def format_metrics():
-    lines = [
-        "# HELP pihole_dns_queries_total Total DNS queries",
-        "# TYPE pihole_dns_queries_total counter",
-        f"pihole_dns_queries_total {metrics_cache.get('dns_queries_total', 0)}",
-        "# HELP pihole_dns_blocked_total Total blocked DNS queries",
-        "# TYPE pihole_dns_blocked_total counter",
-        f"pihole_dns_blocked_total {metrics_cache.get('dns_blocked_total', 0)}",
-        "# HELP pihole_dns_forwarded_total Total forwarded DNS queries",
-        "# TYPE pihole_dns_forwarded_total counter",
-        f"pihole_dns_forwarded_total {metrics_cache.get('dns_forwarded_total', 0)}",
-        "# HELP pihole_dns_cached_total Total cached DNS queries",
-        "# TYPE pihole_dns_cached_total counter",
-        f"pihole_dns_cached_total {metrics_cache.get('dns_cached_total', 0)}",
-        "# HELP pihole_clients_total Total unique clients",
-        "# TYPE pihole_clients_total gauge",
-        f"pihole_clients_total {metrics_cache.get('clients_total', 0)}",
-        "# HELP pihole_gravity_domains Total domains in gravity blocklist",
-        "# TYPE pihole_gravity_domains gauge",
-        f"pihole_gravity_domains {metrics_cache.get('gravity_domains', 0)}",
-        "# HELP pihole_clients_24h Unique clients in last 24 hours",
-        "# TYPE pihole_clients_24h gauge",
-        f"pihole_clients_24h {metrics_cache.get('clients_24h', 0)}",
-    ]
-    lines.append("# HELP pihole_client_queries_total DNS queries per client")
-    lines.append("# TYPE pihole_client_queries_total gauge")
-    for client, stats in per_client_metrics.items():
-        lines.append(f'pihole_client_queries_total{{client="{escape_label_value(client)}"}} {stats["queries"]}')
-    lines.append("# HELP pihole_query_type_total DNS queries by type")
-    lines.append("# TYPE pihole_query_type_total gauge")
-    for qtype, count in query_types.items():
-        lines.append(f'pihole_query_type_total{{type="{escape_label_value(qtype)}"}} {count}')
-    lines.append("# HELP pihole_upstream_queries_total Queries forwarded to upstream servers")
-    lines.append("# TYPE pihole_upstream_queries_total gauge")
-    for server, count in upstream_servers.items():
-        lines.append(f'pihole_upstream_queries_total{{server="{escape_label_value(server)}"}} {count}')
-    lines.append("# HELP pihole_top_blocked_domains_total Top blocked domains")
-    lines.append("# TYPE pihole_top_blocked_domains_total gauge")
-    for item in top_blocked_domains[:20]:
-        lines.append(f'pihole_top_blocked_domains_total{{domain="{escape_label_value(item["domain"])}"}} {item["queries"]}')
+    m = metrics_cache
+    lines = []
+    gauge(lines, "pihole_up", "1 if the Pi-hole API answered the last scrape", pihole_up)
+    # Pi-hole v6 summary values cover the last 24 hours, so they are gauges.
+    gauge(lines, "pihole_dns_queries_total", "DNS queries (last 24h)", m.get("dns_queries_total", 0))
+    gauge(lines, "pihole_dns_blocked_total", "Blocked DNS queries (last 24h)", m.get("dns_blocked_total", 0))
+    gauge(lines, "pihole_dns_forwarded_total", "Forwarded DNS queries (last 24h)", m.get("dns_forwarded_total", 0))
+    gauge(lines, "pihole_dns_cached_total", "Cached DNS queries (last 24h)", m.get("dns_cached_total", 0))
+    gauge(lines, "pihole_dns_queries_24h", "DNS queries in the last 24 hours", m.get("dns_queries_24h", 0))
+    gauge(lines, "pihole_dns_blocked_24h", "Blocked DNS queries in the last 24 hours", m.get("dns_blocked_24h", 0))
+    gauge(lines, "pihole_dns_forwarded_24h", "Forwarded DNS queries in the last 24 hours", m.get("dns_forwarded_24h", 0))
+    gauge(lines, "pihole_dns_cached_24h", "Cached DNS queries in the last 24 hours", m.get("dns_cached_24h", 0))
+    gauge(lines, "pihole_clients_total", "Total unique clients", m.get("clients_total", 0))
+    gauge(lines, "pihole_clients_24h", "Unique clients in last 24 hours", m.get("clients_24h", 0))
+    gauge(lines, "pihole_gravity_domains", "Total domains in gravity blocklist", m.get("gravity_domains", 0))
+    labeled(lines, "pihole_client_queries_total", "DNS queries per client", "client",
+            ((c, s["queries"]) for c, s in per_client_metrics.items()))
+    labeled(lines, "pihole_query_type_total", "DNS queries by type", "type", query_types.items())
+    labeled(lines, "pihole_upstream_queries_total", "Queries forwarded to upstream servers", "server",
+            upstream_servers.items())
+    labeled(lines, "pihole_top_permitted_domains_total", "Top permitted domains", "domain",
+            ((i["domain"], i["queries"]) for i in top_permitted_domains[:TOP_N]))
+    labeled(lines, "pihole_top_blocked_domains_total", "Top blocked domains (gravity, regex, deny)", "domain",
+            ((i["domain"], i["queries"]) for i in top_blocked_domains[:TOP_N]))
     return "\n".join(lines) + "\n"
 
 
