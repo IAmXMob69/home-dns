@@ -1,0 +1,94 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  schedule:
+    # Weekly, Monday 06:17 UTC: catches resolvers/relays that vanish upstream.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DNSCRYPT_PROXY_VERSION: "2.1.19"
+  RUFF_VERSION: "0.17.1"
+  YAMLLINT_VERSION: "1.38.0"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: shellcheck
+        run: shellcheck install.sh scripts/*.sh
+      - name: yamllint
+        run: |
+          pip install "yamllint==${YAMLLINT_VERSION}"
+          yamllint .
+      - name: ruff
+        run: |
+          pip install "ruff==${RUFF_VERSION}"
+          ruff check .
+      - name: python tests (mocked Pi-hole v6 API)
+        run: |
+          pip install requests prometheus_client
+          python tests/test_exporter.py
+          python tests/test_pihole_groups.py
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: docker compose config
+        run: |
+          cp .env.example .env
+          sed -i 's/^LAN_IPV4=.*/LAN_IPV4=192.0.2.10/; s/^TAILSCALE_IPV4=.*/TAILSCALE_IPV4=100.64.0.10/' .env
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.tailscale.yml config --quiet
+          docker compose --profile monitoring config --quiet
+
+  dnscrypt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: resolver and relay names exist in the live lists
+        run: python scripts/check-dnscrypt-names.py dnscrypt/dnscrypt-proxy.toml
+      - name: dnscrypt-proxy -check
+        run: |
+          v="${DNSCRYPT_PROXY_VERSION}"
+          curl -fsSL -o dp.tgz \
+            "https://github.com/DNSCrypt/dnscrypt-proxy/releases/download/${v}/dnscrypt-proxy-linux_x86_64-${v}.tar.gz"
+          tar xzf dp.tgz
+          mkdir -p "$RUNNER_TEMP/dnscrypt-data"
+          sed "s#/data/#$RUNNER_TEMP/dnscrypt-data/#g" dnscrypt/dnscrypt-proxy.toml > "$RUNNER_TEMP/dp.toml"
+          ./linux-x86_64/dnscrypt-proxy -config "$RUNNER_TEMP/dp.toml" -check
+
+  nftables:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: install nftables
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq nftables
+      - name: geolock ruleset builds and passes nft -c
+        run: |
+          printf 'GEOLOCK_ENABLED=1\nGEOLOCK_MODE=allow\nGEOLOCK_ALLOW_COUNTRIES=US,DE\n' > "$RUNNER_TEMP/allow.env"
+          sudo GEOLOCK_SETTINGS="$RUNNER_TEMP/allow.env" GEOLOCK_CACHE="$RUNNER_TEMP/geo" GEOLOCK_DRY_RUN=1 \
+            bash scripts/geolock-apply.sh
+          grep '^GEOLOCK_DENY_COUNTRIES=' geolock/settings.env.example > "$RUNNER_TEMP/deny.env"
+          printf 'GEOLOCK_ENABLED=1\nGEOLOCK_MODE=deny\n' >> "$RUNNER_TEMP/deny.env"
+          sudo GEOLOCK_SETTINGS="$RUNNER_TEMP/deny.env" GEOLOCK_CACHE="$RUNNER_TEMP/geo" GEOLOCK_DRY_RUN=1 \
+            bash scripts/geolock-apply.sh
+      - name: malice ruleset loads in a throwaway netns
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/level1.netset" \
+            https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset
+          sudo MALICE_NFT_DIR="$RUNNER_TEMP/nftables.d" MALICE_NFT_CONF=/nonexistent \
+            MALICE_URL="file://$RUNNER_TEMP/level1.netset" unshare -n bash scripts/malice-ip-apply.sh

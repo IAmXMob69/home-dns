@@ -1,6 +1,7 @@
 version: 2
 updates:
-  - package-ecosystem: "docker"
+  # Image tags in docker-compose.yml (and the Tailscale overlay)
+  - package-ecosystem: "docker-compose"
     directory: "/"
     schedule:
       interval: "weekly"
@@ -12,3 +13,27 @@ updates:
     labels:
       - "dependencies"
       - "docker"
+
+  # Exporter base image (monitoring/Dockerfile)
+  - package-ecosystem: "docker"
+    directory: "/monitoring"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "IAmXMob69"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  # Action versions in .github/workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    labels:
+      - "dependencies"
