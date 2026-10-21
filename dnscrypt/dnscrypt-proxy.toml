@@ -1,17 +1,23 @@
 # Anonymized encrypted upstream
-# Pi-hole -> Unbound -> dnscrypt-proxy -> anonymized relays -> DoH/DoT/DNSCrypt resolvers
+# Pi-hole -> Unbound -> dnscrypt-proxy -> Anonymized DNS relay -> DNSCrypt resolver
 # Relays see your IP but not the query; resolvers see the query but not your IP.
+# Only DNSCrypt servers can go through relays, so DoH/ODoH are off.
+# Each server is routed via relays run by a DIFFERENT operator.
+# Names must exist in the live lists: scripts/check-dnscrypt-names.py
 listen_addresses = ['0.0.0.0:5353']
 max_clients = 250
 ipv4_servers = true
 ipv6_servers = false
 dnscrypt_servers = true
-doh_servers = true
-odoh_servers = true
+doh_servers = false
+odoh_servers = false
 require_dnssec = true
 require_nolog = true
 require_nofilter = true
-server_names = ['cloudflare', 'quad9-dnscrypt-ip4-nofilter-pri', 'quad9-doh-ip4-port443-nofilter-pri', 'quad9-doh-ip4-port443-nofilter-alt', 'dns.sb', 'dnscrypt.ca-1', 'dnscrypt.ca-2', 'cs-usny', 'cs-usil', 'cs-usse', 'cs-uswa', 'mullvad-base-doh']
+server_names = [
+  'cs-nyc', 'cs-dc', 'cs-il',
+  'dnscry.pt-newyork-ipv4', 'dnscry.pt-ashburn-ipv4', 'dnscry.pt-chicago-ipv4'
+]
 
 force_tcp = false
 timeout = 5000
@@ -29,9 +35,16 @@ netprobe_timeout = 60
 netprobe_address = '9.9.9.9:53'
 
 [anonymized_dns]
+# Never fall back to talking to a resolver directly.
 skip_incompatible = true
+direct_cert_fallback = false
 routes = [
-  { server_name = '*', via = ['anon-cs-il', 'anon-cs-nyc', 'anon-cs-sea', 'anon-kama', 'anon-sfo', 'odohrelay-crypto-sx'] }
+  { server_name = 'cs-nyc', via = ['dnscry.pt-anon-newyork-ipv4', 'dnscry.pt-anon-ashburn-ipv4', 'dnscry.pt-anon-chicago-ipv4', 'anon-kama'] },
+  { server_name = 'cs-dc', via = ['dnscry.pt-anon-newyork-ipv4', 'dnscry.pt-anon-ashburn-ipv4', 'dnscry.pt-anon-chicago-ipv4', 'anon-kama'] },
+  { server_name = 'cs-il', via = ['dnscry.pt-anon-newyork-ipv4', 'dnscry.pt-anon-ashburn-ipv4', 'dnscry.pt-anon-chicago-ipv4', 'anon-kama'] },
+  { server_name = 'dnscry.pt-newyork-ipv4', via = ['anon-cs-nyc', 'anon-cs-dc', 'anon-cs-il', 'anon-kama'] },
+  { server_name = 'dnscry.pt-ashburn-ipv4', via = ['anon-cs-nyc', 'anon-cs-dc', 'anon-cs-il', 'anon-kama'] },
+  { server_name = 'dnscry.pt-chicago-ipv4', via = ['anon-cs-nyc', 'anon-cs-dc', 'anon-cs-il', 'anon-kama'] }
 ]
 
 [sources.public-resolvers]
@@ -51,23 +64,3 @@ urls = [
 cache_file = '/data/relays.md'
 minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
 refresh_delay = 72
-prefix = 'anon-'
-
-[sources.odoh-servers]
-urls = [
-  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-servers.md',
-  'https://download.dnscrypt.info/resolvers-list/v3/odoh-servers.md'
-]
-cache_file = '/data/odoh-servers.md'
-minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
-refresh_delay = 72
-
-[sources.odoh-relays]
-urls = [
-  'https://raw.githubusercontent.com/DNSCrypt/dnscrypt-resolvers/master/v3/odoh-relays.md',
-  'https://download.dnscrypt.info/resolvers-list/v3/odoh-relays.md'
-]
-cache_file = '/data/odoh-relays.md'
-minisign_key = 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3'
-refresh_delay = 72
-prefix = 'odohrelay-'
