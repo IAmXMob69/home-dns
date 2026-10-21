@@ -170,10 +170,12 @@ sudo ./scripts/geolock-apply.sh
 
 Your house LAN is always allowed so you cannot lock yourself out.
 
+Country lists refresh after 7 days (`--refresh` forces it). A failed download keeps the last good list; with no list at all, nothing is applied.
+
 ## Things that do **not** have a login
 
 - **Unbound** — checks DNS answers. No page.
-- **dnscrypt** — encrypts lookups. No page.
+- **dnscrypt** — encrypts lookups and sends them through a relay. No page.
 - **GitHub** — you only downloaded files.
 - **Docker** — it runs the boxes. You can skip creating a Docker Hub user.
 
