@@ -88,15 +88,15 @@ All optional. Each one only touches its own entries, and `--dry-run` previews wh
 
 Do not add `1.1.1.1` to Pi-hole's upstream servers; that skips the blocker. Do not open port 53 to the internet.
 
-## eMudhra lockout
+## Indian CA lockout
 
-Three independent layers stop this host from trusting or reaching the eMudhra (emSign) certificate authority. Each works on its own; use all three for full coverage.
+Three independent layers stop this host from trusting or reaching eMudhra (emSign) and the other certificate authorities licensed under CCA India, including the CCA root itself. Each works on its own; use all three for full coverage.
 
-- **Certificates**: `./scripts/distrust-emudhra.sh` moves the four emSign roots onto the system distrust list (Arch, Fedora, Debian/Ubuntu) and verifies the result. Roots are matched by label and pinned SHA-256 fingerprint, so nothing else is touched. `--check` reports without changing anything. Needs sudo.
-- **DNS**: the eMudhra entries in `privacy-shield/privacy-shield.tsv` block the company's sites, OCSP, CRL and repository names. Load them with `./scripts/privacy-shield-pihole.sh`.
-- **Firewall (Linux)**: `sudo nft -f automation/emudhra-block/emudhra-block.nft` drops traffic to and from the address space eMudhra announces from its own networks. Sites it hosts on shared cloud or CDN ranges are covered by the DNS layer only, so no unrelated services are caught.
+- **Certificates**: `./scripts/distrust-india-cas.sh` moves the four emSign roots, the only Indian roots in the stores distributions ship, onto the system distrust list (Arch, Fedora, Debian/Ubuntu) and verifies the result. Roots are matched by label and pinned SHA-256 fingerprint, so nothing else is touched. `--check` reports without changing anything. Needs sudo.
+- **DNS**: the CA entries in `privacy-shield/privacy-shield.tsv` block each CA's site, OCSP, CRL, repository and eSign names. When a CA sits inside a larger organisation (Sify, C-DAC, Protean, CSC, CDSL, Jio, NIC), only its CA hosts are listed and the parent domain keeps working. Load them with `./scripts/privacy-shield-pihole.sh`.
+- **Firewall (Linux)**: `sudo nft -f automation/india-ca-block/india-ca-block.nft` drops traffic to and from address space that a CA owns and announces from its own ASN (eMudhra, (n)Code Solutions, IDRBT). CAs hosted on ISP, data-centre, cloud or CDN ranges are covered by the DNS layer only, so no unrelated services are caught.
 
-Sites that rely on eMudhra certificates will show a certificate error after this, which is expected. Undo with `sudo nft delete table inet emudhra_block`, by removing the files the script placed in the blocklist directory (or the `!mozilla/emSign*` lines in `/etc/ca-certificates.conf`) and rerunning `update-ca-trust` or `update-ca-certificates`, and by disabling the entries in Pi-hole.
+Sites and documents that rely on these CAs will show certificate or signature errors afterwards, which is expected. Undo with `sudo nft delete table inet india_ca_block`, by removing the files the script placed in the blocklist directory (or the `!mozilla/emSign*` lines in `/etc/ca-certificates.conf`) and rerunning `update-ca-trust` or `update-ca-certificates`, and by disabling the entries in Pi-hole.
 
 ## Encrypted DNS and Tailscale
 

@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
-# Distrust the eMudhra emSign root CAs in the system trust store.
+# Distrust Indian licensed CA roots in the system trust store.
 # Each root is matched by label and must also match its pinned SHA-256
 # fingerprint, so nothing else can end up on the blocklist. Safe to re-run.
 #
-#   ./scripts/distrust-emudhra.sh           apply (calls sudo where needed)
-#   ./scripts/distrust-emudhra.sh --check   report only, changes nothing
+#   ./scripts/distrust-india-cas.sh           apply (calls sudo where needed)
+#   ./scripts/distrust-india-cas.sh --check   report only, changes nothing
 #
 # Arch and Fedora: blocklist under trust-source / ca-trust, then update-ca-trust.
 # Debian and Ubuntu: deselect the file in /etc/ca-certificates.conf, then
 # update-ca-certificates. Firefox on these systems follows the system store.
+#
+# The eMudhra emSign roots are the only Indian-owned roots in the Mozilla
+# bundle that distributions ship. The CCA India roots (2011, 2014, 2015, 2022)
+# and the CAs under them are not in public browser or OS stores, so there is
+# nothing to distrust for them unless they were imported by hand.
 set -euo pipefail
 
-# label|sha256 (no colons, upper case)
+# label|sha256 (no colons, upper case). eMudhra emSign roots.
 ROOTS=(
   "emSign Root CA - G1|40F6AF0346A99AA1CD1D555A4E9CCE62C7F9634603EE406615833DC8C8D00367"
   "emSign Root CA - C1|125609AA301DA0A249B97A8239CB6A34216F44DCAC9F3954B14292F2E8C8608F"

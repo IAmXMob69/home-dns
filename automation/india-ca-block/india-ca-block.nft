@@ -1,0 +1,51 @@
+#!/usr/bin/nft -f
+# Drop traffic to and from address space owned by Indian licensed
+# certificate authorities (CCA India hierarchy).
+# Only prefixes registered to the CA itself and announced by its own ASN
+# are listed. CAs that run on ISPs, data centres, cloud or CDN ranges, or
+# inside a larger parent's network (Sify, C-DAC, NIC, Jio and most others),
+# are blocked in Pi-hole by name instead, never here.
+
+destroy table inet india_ca_block
+table inet india_ca_block {
+  set ca4 {
+    type ipv4_addr
+    flags interval
+    auto-merge
+    elements = {
+      # eMudhra Limited (AS141213, AS142057)
+      103.156.134.0/24,
+      103.165.181.0/24,
+      # (n)Code Solutions, GNFC (AS58702)
+      103.20.104.0/23,
+      # IDRBT CA (AS153301). Also carries the IDRBT institute site.
+      161.248.159.0/24
+    }
+  }
+  set ca6 {
+    type ipv6_addr
+    flags interval
+    auto-merge
+    elements = {
+      # eMudhra Limited, registered allocation
+      2001:df4:ef80::/48
+    }
+  }
+  chain input {
+    type filter hook input priority filter - 7; policy accept;
+    ip saddr @ca4 counter drop comment "drop IPv4 from Indian CAs"
+    ip6 saddr @ca6 counter drop comment "drop IPv6 from Indian CAs"
+  }
+  chain output {
+    type filter hook output priority filter - 7; policy accept;
+    ip daddr @ca4 counter drop comment "drop IPv4 to Indian CAs"
+    ip6 daddr @ca6 counter drop comment "drop IPv6 to Indian CAs"
+  }
+  chain forward {
+    type filter hook forward priority filter - 7; policy accept;
+    ip saddr @ca4 counter drop comment "drop IPv4 from Indian CAs fwd"
+    ip6 saddr @ca6 counter drop comment "drop IPv6 from Indian CAs fwd"
+    ip daddr @ca4 counter drop comment "drop IPv4 to Indian CAs fwd"
+    ip6 daddr @ca6 counter drop comment "drop IPv6 to Indian CAs fwd"
+  }
+}

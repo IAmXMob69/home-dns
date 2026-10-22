@@ -100,8 +100,32 @@
 3	(^|\.)stats\.wp\.com$	WordPress/Automattic stats
 3	(^|\.)pixel\.wp\.com$	WordPress/Automattic pixel
 
-# Certificate authority lockout: eMudhra / emSign.
+# Certificate authority lockout: Indian licensed CAs (CCA India hierarchy).
+# Where a CA runs inside a larger organisation, only its CA, eSign and
+# repository hosts are listed; the parent domain is left alone.
 3	emudhra	eMudhra (any name containing it)
 3	(^|\.)emsign\.(com|in|net|us)$	eMudhra emSign CA, OCSP, CRL and repository
 3	(^|\.)e-mudhra\.com$	eMudhra legacy site and OCSP
 3	(^|\.)emsigner\.com$	eMudhra emSigner signing portal
+3	(^|\.)cca\.gov\.in$	CCA India root CA, CRL and repository
+3	(^|\.)ocvs\.gov\.in$	CCA India OCSP
+3	(^|\.)safescrypt\.com$	Sify Safescrypt CA, OCSP and CRL (sify.com not blocked)
+3	(^|\.)idrbtca\.org\.in$	IDRBT CA and OCSP (idrbt.ac.in not blocked)
+3	(^|\.)ncodesolutions\.com$	(n)Code Solutions CA and OCSP
+3	(^|\.)ncode\.in$	(n)Code Solutions, GNFC IT division
+3	^esign\.cdac\.in$	C-DAC CA and eSign only (cdac.in not blocked)
+3	(^|\.)certificate\.digital$	Capricorn CA and OCSP
+3	(^|\.)capricornid\.com$	Capricorn eKYC for DSC issuance
+3	^egov\.proteantech\.in$	Protean eGov CA repository and CRL only (proteantech.in not blocked)
+3	(^|\.)vsign\.in$	Verasys Vsign CA and OCSP
+3	(^|\.)cscdigisign\.in$	CSC CA repository, CRL and OCSP (csc.gov.in not blocked)
+3	(^|\.)idsignca\.com$	IDSign CA and OCSP
+3	^esign\.cdslindia\.com$	CDSL Ventures CA and eSign only (cdslindia.com not blocked)
+3	(^|\.)pantasign\.com$	PantaSign CA and OCSP
+3	(^|\.)xtratrust\.com$	XtraTrust CA
+3	(^|\.)prodigisign\.com$	ProDigiSign CA and OCSP
+3	(^|\.)signxca\.com$	SignX CA and OCSP
+3	(^|\.)care4sign\.com$	Care4Sign CA and OCSP
+3	(^|\.)speedsignca\.com$	SpeedSign CA and OCSP
+3	^jioesp\.jio\.com$	Reliance Jio (RPSL) CA and eSign only (jio.com not blocked)
+3	^nicca\.nic\.in$	NIC CA, closed (nic.in not blocked)
