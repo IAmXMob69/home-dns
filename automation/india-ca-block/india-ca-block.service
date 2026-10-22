@@ -1,0 +1,13 @@
+[Unit]
+Description=Block Indian CA address space
+Wants=network-pre.target
+Before=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/nft -f /etc/nftables.d/india-ca-block.nft
+ExecStop=/usr/bin/nft destroy table inet india_ca_block
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

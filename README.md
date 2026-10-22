@@ -95,6 +95,15 @@ Three independent layers stop this host from trusting or reaching eMudhra (emSig
 - **Certificates**: `./scripts/distrust-india-cas.sh` moves the four emSign roots, the only Indian roots in the stores distributions ship, onto the system distrust list (Arch, Fedora, Debian/Ubuntu) and verifies the result. Roots are matched by label and pinned SHA-256 fingerprint, so nothing else is touched. `--check` reports without changing anything. Needs sudo.
 - **DNS**: the CA entries in `privacy-shield/privacy-shield.tsv` block each CA's site, OCSP, CRL, repository and eSign names. When a CA sits inside a larger organisation (Sify, C-DAC, Protean, CSC, CDSL, Jio, NIC), only its CA hosts are listed and the parent domain keeps working. Load them with `./scripts/privacy-shield-pihole.sh`.
 - **Firewall (Linux)**: `sudo nft -f automation/india-ca-block/india-ca-block.nft` drops traffic to and from address space that a CA owns and announces from its own ASN (eMudhra, (n)Code Solutions, IDRBT). CAs hosted on ISP, data-centre, cloud or CDN ranges are covered by the DNS layer only, so no unrelated services are caught.
+  To load it at every boot, install the rule and its unit, then enable the unit:
+
+  ```sh
+  sudo install -Dm644 automation/india-ca-block/india-ca-block.nft /etc/nftables.d/india-ca-block.nft
+  sudo install -Dm644 automation/india-ca-block/india-ca-block.service /etc/systemd/system/india-ca-block.service
+  sudo systemctl daemon-reload && sudo systemctl enable --now india-ca-block.service
+  ```
+
+  The unit loads only its own table, so it leaves the rest of the ruleset alone and works without the stock `nftables` service.
 
 Sites and documents that rely on these CAs will show certificate or signature errors afterwards, which is expected. Undo with `sudo nft delete table inet india_ca_block`, by removing the files the script placed in the blocklist directory (or the `!mozilla/emSign*` lines in `/etc/ca-certificates.conf`) and rerunning `update-ca-trust` or `update-ca-certificates`, and by disabling the entries in Pi-hole.
 
