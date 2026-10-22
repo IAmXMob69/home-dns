@@ -99,3 +99,7 @@
 3	(^|\.)matomo\.cloud$	Matomo analytics
 3	(^|\.)stats\.wp\.com$	WordPress/Automattic stats
 3	(^|\.)pixel\.wp\.com$	WordPress/Automattic pixel
+
+# Certificate authority lockout: eMudhra / emSign.
+3	emudhra	eMudhra (any name containing it)
+3	(^|\.)emsign\.(com|in|net)$	eMudhra emSign CA, OCSP and repository
