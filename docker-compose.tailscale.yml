@@ -7,3 +7,7 @@ services:
       - "${TAILSCALE_IPV4}:53:53/udp"
     environment:
       FTLCONF_dns_hosts: "${LAN_IPV4} pihole.lan pi.hole;${TAILSCALE_IPV4} pihole.lan pi.hole"
+  dnsdist:
+    ports:
+      - "${TAILSCALE_IPV4}:853:853/tcp"
+      - "${TAILSCALE_IPV4}:8443:8443/tcp"

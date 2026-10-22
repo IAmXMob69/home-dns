@@ -1,6 +1,6 @@
-# Pi-hole + Unbound
-# Clients -> Pi-hole (block) -> Unbound (DNSSEC + LAN DoT :853) -> dnscrypt-proxy (anonymized) -> internet
-# Unbound is not published on the LAN. Only Pi-hole DNS (53) is.
+# Pi-hole + Unbound + dnsdist
+# Encrypted clients: DoT :853 / DoH :8443 -> dnsdist -> Pi-hole (block) -> Unbound -> dnscrypt-proxy -> internet
+# Plain :53 stays published for IoT/DHCP bootstrap. Unbound is compose-network only.
 # Admin UI is loopback-only; Tailscale Serve fronts it with HTTPS.
 # Host binds are IPv4-only. Never 0.0.0.0 or [::] on a dual-stack host
 # (a wildcard bind would be an open resolver).
@@ -18,6 +18,7 @@ services:
     hostname: dnscrypt
     networks:
       default:
+        # Static: Unbound forwards to this IP. Do not let IPAM hand .2 to prometheus.
         ipv4_address: 172.30.90.2
     restart: unless-stopped
     cpu_shares: 1024
@@ -42,6 +43,9 @@ services:
     container_name: unbound
     image: klutchell/unbound:latest
     hostname: unbound
+    networks:
+      default:
+        ipv4_address: 172.30.90.4
     depends_on:
       dnscrypt:
         condition: service_healthy
@@ -52,10 +56,6 @@ services:
     mem_limit: 512m
     mem_reservation: 256m
     logging: *default-logging
-    ports:
-      # LAN DNS-over-TLS (Private DNS / DoT clients). Never 0.0.0.0.
-      - "127.0.0.1:853:853/tcp"
-      - "${LAN_IPV4}:853:853/tcp"
     volumes:
       - ./unbound/custom.conf.d:/etc/unbound/custom.conf.d:ro
       # Host CA bundle, copied by install.sh (Debian/Ubuntu/Arch paths differ).
@@ -71,8 +71,11 @@ services:
 
   pihole:
     container_name: pihole
-    image: pihole/pihole:2026.07.2
+    image: pihole/pihole:2026.10.0
     hostname: pihole
+    networks:
+      default:
+        ipv4_address: 172.30.90.5
     depends_on:
       unbound:
         condition: service_healthy
@@ -105,7 +108,7 @@ services:
       FTLCONF_dns_hosts: "${LAN_IPV4} pihole.lan pi.hole;${TAILSCALE_IPV4} pihole.lan pi.hole"
       # Expert profile (2026-09-10): EDE CODE, deep CNAME/ESNI; cache capped at 10000 (dnsmasq warn).
       FTLCONF_dns_cache_size: "10000"
-      FTLCONF_dns_rateLimit_count: "1000"
+      FTLCONF_dns_rateLimit_count: "2000"
       FTLCONF_dns_rateLimit_interval: "60"
       FTLCONF_dns_EDNS0ECS: "false"
       FTLCONF_dns_blocking_mode: "NULL"
@@ -161,13 +164,56 @@ services:
       retries: 5
       start_period: 45s
 
+  dnsdist:
+    container_name: dnsdist
+    image: powerdns/dnsdist-19:latest
+    hostname: dnsdist
+    networks:
+      default:
+        ipv4_address: 172.30.90.8
+    depends_on:
+      pihole:
+        condition: service_healthy
+    restart: unless-stopped
+    cpu_shares: 512
+    cpus: 0.5
+    mem_limit: 256m
+    mem_reservation: 64m
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    logging: *default-logging
+    ports:
+      # LAN/loopback DNS-over-TLS. Never 0.0.0.0.
+      - "127.0.0.1:853:853/tcp"
+      - "${LAN_IPV4}:853:853/tcp"
+      # DNS-over-HTTPS (RFC 8484 /dns-query). Never 0.0.0.0.
+      - "127.0.0.1:8443:8443/tcp"
+      - "${LAN_IPV4}:8443:8443/tcp"
+    volumes:
+      - ./dnsdist/pihole.conf:/etc/dnsdist/conf.d/pihole.conf:ro
+      - ./dnsdist/tls.pem:/etc/dnsdist/certs/tls.pem:ro
+      - ./dnsdist/tls.key:/etc/dnsdist/certs/tls.key:ro
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo -n >/dev/tcp/127.0.0.1/853'"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   # Optional: docker compose --profile monitoring up -d
   pihole-exporter:
     profiles: ["monitoring"]
     container_name: pihole-exporter
+    networks:
+      default:
+        ipv4_address: 172.30.90.3
+    # Go build (go/cmd/pihole-exporter). Python fallback: context ./monitoring,
+    # dockerfile Dockerfile.
     build:
-      context: ./monitoring
-      dockerfile: Dockerfile
+      context: ./go
+      dockerfile: Dockerfile.exporter
     environment:
       PIHOLE_HOSTNAME: pihole
       PIHOLE_PORT: "80"
@@ -191,6 +237,9 @@ services:
   prometheus:
     profiles: ["monitoring"]
     container_name: prometheus
+    networks:
+      default:
+        ipv4_address: 172.30.90.7
     image: prom/prometheus:latest
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -213,6 +262,9 @@ services:
   grafana:
     profiles: ["monitoring"]
     container_name: grafana
+    networks:
+      default:
+        ipv4_address: 172.30.90.6
     image: grafana/grafana:latest
     environment:
       GF_SECURITY_ADMIN_USER: admin

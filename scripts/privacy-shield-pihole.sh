@@ -11,7 +11,9 @@ if [[ ! -f "$TSV" ]]; then
   echo "missing $TSV" >&2
   exit 1
 fi
-python3 "$ROOT/scripts/lib/pihole_groups.py" \
+# Go build if present, else the Python original.
+if [[ -x "$ROOT/go/bin/pihole-groups" ]]; then GROUPS_TOOL=("$ROOT/go/bin/pihole-groups"); else GROUPS_TOOL=(python3 "$ROOT/scripts/lib/pihole_groups.py"); fi
+"${GROUPS_TOOL[@]}" \
   --group "Data collection halt" \
   --description "On = block telemetry, analytics, crash-report, and tracker endpoints. Off = those names work again. Use this switch." \
   --tag "privacy-shield: " \

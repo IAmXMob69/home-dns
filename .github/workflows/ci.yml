@@ -40,6 +40,20 @@ jobs:
           python tests/test_exporter.py
           python tests/test_pihole_groups.py
 
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go/go.mod
+      - name: vet, test, build
+        working-directory: go
+        run: |
+          go vet ./...
+          go test ./...
+          go build ./...
+
   compose:
     runs-on: ubuntu-latest
     steps:

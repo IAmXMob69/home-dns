@@ -24,7 +24,9 @@ do
   [[ -f "$f" ]] && args+=(--exact "$f:Geo lock ${pair#*:} domain")
 done
 
-python3 "$ROOT/scripts/lib/pihole_groups.py" "${args[@]}" "$@"
+# Go build if present, else the Python original.
+if [[ -x "$ROOT/go/bin/pihole-groups" ]]; then GROUPS_TOOL=("$ROOT/go/bin/pihole-groups"); else GROUPS_TOOL=(python3 "$ROOT/scripts/lib/pihole_groups.py"); fi
+"${GROUPS_TOOL[@]}" "${args[@]}" "$@"
 echo
 echo "In the Pi-hole page (http://127.0.0.1/admin/) sign in, then:"
 echo "  Group management → Groups → Geo-Location Lock"

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Fresh host or recreate: copy CA bundle, DoT cert, start DNS chain.
+# Fresh host or recreate: copy CA bundle, DoT cert, start DNS chain
+# (dnscrypt -> unbound -> pihole, with dnsdist DoT/DoH in front).
 set -euo pipefail
+# Go build if present (go/bin/pihole-install); PIHOLE_NO_GO=1 forces the shell body below.
+_go_bin="$(cd "$(dirname "$0")" && pwd)/go/bin/pihole-install"
+if [[ -z "${PIHOLE_NO_GO:-}" && -x "${_go_bin}" ]]; then
+  PIHOLE_ARGV0="$0" PIHOLE_ROOT="$(cd "$(dirname "$0")" && pwd)" exec "${_go_bin}" "$@"
+fi
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
@@ -35,6 +41,19 @@ if [[ ! -f unbound/tls.pem || ! -f unbound/tls.key ]]; then
 fi
 chmod 644 unbound/tls.pem
 
+# dnsdist (DoT :853 / DoH :8443) wants a cert in dnsdist/. With Tailscale and
+# DOT_AUTH_NAME set it gets a real one; otherwise it reuses the self-signed one.
+mkdir -p dnsdist
+chmod +x scripts/refresh-dot-cert.sh
+./scripts/refresh-dot-cert.sh || true
+if [[ ! -s dnsdist/tls.pem || ! -s dnsdist/tls.key ]]; then
+  echo "Using the self-signed pihole.lan cert for dnsdist."
+  cp unbound/tls.pem dnsdist/tls.pem
+  chmod 644 dnsdist/tls.pem
+  docker run --rm --network none -v "$ROOT/unbound:/u:ro" -v "$ROOT/dnsdist:/k" busybox:stable \
+    sh -c 'cp /u/tls.key /k/tls.key && chown 953:953 /k/tls.key && chmod 600 /k/tls.key'
+fi
+
 # The DoT key stays 0600 and is owned by Unbound's uid (101:102) so only
 # Unbound can read it. Docker does the chown, so no sudo is needed.
 fix_key_owner() {
@@ -49,7 +68,7 @@ fix_key_owner
 mkdir -p etc-pihole
 chmod +x scripts/*.sh install.sh
 
-docker compose up -d --force-recreate dnscrypt unbound pihole
+docker compose up -d --force-recreate dnscrypt unbound pihole dnsdist
 docker compose ps
 echo
 echo "Probe Unbound:"

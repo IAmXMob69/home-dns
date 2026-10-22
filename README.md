@@ -109,6 +109,27 @@ Known-bad IPs (FireHOL level1), Linux only:
 sudo ./scripts/malice-ip-apply.sh
 ```
 
+## Encrypted DNS (DoT / DoH)
+
+dnsdist sits in front of Pi-hole: DoT on `:853`, DoH on `:8443/dns-query`.
+`install.sh` gives it a self-signed `pihole.lan` cert. For a real cert on a Tailscale node:
+
+```bash
+DOT_AUTH_NAME=your-host.your-tailnet.ts.net ./scripts/refresh-dot-cert.sh
+```
+
+## Go tools (optional)
+
+`go/` has Go builds of `install.sh`, the geolock, malice-IP and cert scripts, the group sync and the exporter.
+
+```bash
+make -C go
+```
+
+When `go/bin/<tool>` exists the script runs it; otherwise the shell or Python version runs. Force the old path with `PIHOLE_NO_GO=1`. The Grafana exporter image builds from `go/` on its own.
+
+Geolock host extras, off unless set: `GEOLOCK_TAILSCALE_UNDERLAY=1` lets tailscaled reach any country; `GEOLOCK_APP_CGROUP=<cgroup path>` limits one app's cgroup to the listed countries (allow mode).
+
 ## License
 
 Configs are as-is for personal reuse. Pi-hole, Unbound, and dnscrypt-proxy keep their own licenses.

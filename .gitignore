@@ -11,3 +11,6 @@ backups/
 logs/
 __pycache__/
 
+dnsdist/tls.key
+dnsdist/tls.pem
+go/bin/

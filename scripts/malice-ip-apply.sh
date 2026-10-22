@@ -4,6 +4,11 @@
 # Forward is covered too: Docker-published ports and container traffic
 # are routed, so they never touch the input/output hooks.
 set -euo pipefail
+# Go build if present (go/bin/malice-ip-apply); PIHOLE_NO_GO=1 forces the shell body below.
+_go_bin="$(cd "$(dirname "$0")/.." && pwd)/go/bin/malice-ip-apply"
+if [[ -z "${PIHOLE_NO_GO:-}" && -x "${_go_bin}" ]]; then
+  PIHOLE_ARGV0="$0" PIHOLE_ROOT="$(cd "$(dirname "$0")/.." && pwd)" exec "${_go_bin}" "$@"
+fi
 NFT_DIR="${MALICE_NFT_DIR:-/etc/nftables.d}"
 NFT_CONF="${MALICE_NFT_CONF:-/etc/nftables.conf}"
 URL="${MALICE_URL:-https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset}"

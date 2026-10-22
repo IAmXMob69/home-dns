@@ -6,6 +6,11 @@
 #   sudo ./scripts/geolock-apply.sh --refresh  re-download every list now
 #   GEOLOCK_DRY_RUN=1 ./scripts/geolock-apply.sh   build + nft -c only, no root needed
 set -euo pipefail
+# Go build if present (go/bin/geolock-apply); PIHOLE_NO_GO=1 forces the shell body below.
+_go_bin="$(cd "$(dirname "$0")/.." && pwd)/go/bin/geolock-apply"
+if [[ -z "${PIHOLE_NO_GO:-}" && -x "${_go_bin}" ]]; then
+  PIHOLE_ARGV0="$0" PIHOLE_ROOT="$(cd "$(dirname "$0")/.." && pwd)" exec "${_go_bin}" "$@"
+fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENVF="${GEOLOCK_SETTINGS:-$ROOT/geolock/settings.env}"
 CACHE="${GEOLOCK_CACHE:-$ROOT/geolock/cache}"
@@ -165,6 +170,20 @@ trap 'rm -f "$tmp_nft"' EXIT
   echo '  chain output {'
   echo '    type filter hook output priority filter - 5; policy accept;'
   echo '    ip daddr @pass4 accept'
+  # Optional host extras (env, off by default; the cgroups must exist):
+  #   GEOLOCK_TAILSCALE_UNDERLAY=1  let tailscaled reach any country
+  #   GEOLOCK_APP_CGROUP=<path>     allow mode: that cgroup may only reach
+  #                                 listed countries, and no IPv6
+  if [[ "${GEOLOCK_TAILSCALE_UNDERLAY:-0}" == "1" ]]; then
+    echo '    socket cgroupv2 level 2 "system.slice/tailscaled.service" accept comment "tailscale underlay"'
+  fi
+  if [[ "$GEOLOCK_MODE" == "allow" && -n "${GEOLOCK_APP_CGROUP:-}" ]]; then
+    app_cg="${GEOLOCK_APP_CGROUP#/}"
+    IFS=/ read -ra _parts <<<"$app_cg"
+    app_lvl="${#_parts[@]}"
+    echo "    meta nfproto ipv6 socket cgroupv2 level ${app_lvl} \"${app_cg}\" drop"
+    echo "    socket cgroupv2 level ${app_lvl} \"${app_cg}\" ip daddr != @listed4 drop"
+  fi
   if [[ "$GEOLOCK_MODE" == "deny" ]]; then
     echo "    meta l4proto { tcp, udp } th dport { $ports } ip daddr @listed4 counter drop"
     echo "    meta l4proto { tcp, udp } th sport { $ports } ip daddr @listed4 counter drop"
