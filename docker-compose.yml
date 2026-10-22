@@ -135,6 +135,7 @@ services:
       # Custom cert in etc-pihole/tls.pem — do not let FTL overwrite it.
       FTLCONF_webserver_tls_validity: "0"
       # CivetWeb/mbedTLS: TLS 1.2+ only, AEAD cipher suites only (no CBC/SHA-1).
+      # yamllint disable-line rule:line-length
       FTLCONF_webserver_advancedOpts: '["ssl_protocol_version=4","ssl_cipher_list=TLS1-3-AES-256-GCM-SHA384:TLS1-3-CHACHA20-POLY1305-SHA256:TLS1-3-AES-128-GCM-SHA256:TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384:TLS-ECDHE-RSA-WITH-AES-256-GCM-SHA384:TLS-ECDHE-ECDSA-WITH-CHACHA20-POLY1305-SHA256:TLS-ECDHE-RSA-WITH-CHACHA20-POLY1305-SHA256:TLS-ECDHE-ECDSA-WITH-AES-128-GCM-SHA256:TLS-ECDHE-RSA-WITH-AES-128-GCM-SHA256"]'
       FTLCONF_webserver_interface_boxed: "true"
       FTLCONF_webserver_interface_theme: default-dark
