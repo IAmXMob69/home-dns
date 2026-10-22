@@ -130,7 +130,12 @@ services:
       # UI is loopback + Tailscale Serve (source 127.0.0.1). Exporter is 172.16/12.
       FTLCONF_webserver_acl: "+127.0.0.1,+[::1],+172.16.0.0/12"
       # Do not listen on [::] inside the container either.
-      FTLCONF_webserver_port: "80o,443os"
+      # 80or redirects HTTP to HTTPS when the cert is present; 443os is TLS.
+      FTLCONF_webserver_port: "80or,443os"
+      # Custom cert in etc-pihole/tls.pem — do not let FTL overwrite it.
+      FTLCONF_webserver_tls_validity: "0"
+      # CivetWeb/mbedTLS: TLS 1.2+ only, AEAD cipher suites only (no CBC/SHA-1).
+      FTLCONF_webserver_advancedOpts: '["ssl_protocol_version=4","ssl_cipher_list=TLS1-3-AES-256-GCM-SHA384:TLS1-3-CHACHA20-POLY1305-SHA256:TLS1-3-AES-128-GCM-SHA256:TLS-ECDHE-ECDSA-WITH-AES-256-GCM-SHA384:TLS-ECDHE-RSA-WITH-AES-256-GCM-SHA384:TLS-ECDHE-ECDSA-WITH-CHACHA20-POLY1305-SHA256:TLS-ECDHE-RSA-WITH-CHACHA20-POLY1305-SHA256:TLS-ECDHE-ECDSA-WITH-AES-128-GCM-SHA256:TLS-ECDHE-RSA-WITH-AES-128-GCM-SHA256"]'
       FTLCONF_webserver_interface_boxed: "true"
       FTLCONF_webserver_interface_theme: default-dark
       # Docker cannot set the host clock; do not serve NTP on 123/udp either.

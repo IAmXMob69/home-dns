@@ -7,7 +7,7 @@ and trackers. The rest of the chain looks up the real answer privately.
 
 ## What runs
 
-- **Pi-hole 2026.10.0**: the blocker and the admin page at http://127.0.0.1/admin/.
+- **Pi-hole 2026.10.0**: the blocker and the admin page at https://127.0.0.1/admin/ (HTTP redirects to HTTPS).
 - **Unbound**: checks answers (DNSSEC). It is Pi-hole's only upstream.
 - **dnscrypt-proxy**: sends lookups out encrypted through anonymizing relays.
 - **dnsdist**: encrypted DNS for your devices. DoT on port 853, DoH on port 8443 (`/dns-query`).
@@ -35,7 +35,7 @@ nano .env
 ./install.sh
 ```
 
-5. Open http://127.0.0.1/admin/ on this computer. There is no username; type the password from step 3.
+5. Open https://127.0.0.1/admin/ on this computer (accept the local certificate once). There is no username; type the password from step 3.
 6. Point your router's DNS (or each device) at `LAN_IPV4`.
 
 Step-by-step guide: [SETUP.md](./SETUP.md). Windows: [SETUP-windows.md](./SETUP-windows.md) (Docker Desktop, then `.\install.ps1`).
@@ -106,6 +106,64 @@ Three independent layers stop this host from trusting or reaching eMudhra (emSig
   The unit loads only its own table, so it leaves the rest of the ruleset alone and works without the stock `nftables` service.
 
 Sites and documents that rely on these CAs will show certificate or signature errors afterwards, which is expected. Undo with `sudo nft delete table inet india_ca_block`, by removing the files the script placed in the blocklist directory (or the `!mozilla/emSign*` lines in `/etc/ca-certificates.conf`) and rerunning `update-ca-trust` or `update-ca-certificates`, and by disabling the entries in Pi-hole.
+
+
+## Admin TLS and resolver integrity
+
+"Encrypt the Pi-hole" here means three concrete things. It does **not** mean handing
+lookups to Cloudflare, Google or Quad9 over DoH — that would trade a self-hosted
+path for a third-party view of every query. The chain stays:
+
+device → Pi-hole → Unbound (DNSSEC) → dnscrypt-proxy (anonymized DNSCrypt) → internet.
+
+### What was already strong
+
+- Unbound validates DNSSEC (`auto-trust-anchor-file` / `root.key`). Bogus zones
+  such as `fail01.dnssec.works` return SERVFAIL. Pi-hole itself has DNSSEC
+  checking off on purpose so answers are not double-validated into false SERVFAILs.
+- Hardening flags on: `harden-glue`, `harden-dnssec-stripped`, `harden-below-nxdomain`,
+  `harden-large-queries`, `harden-short-bufsize`, `deny-any`, `qname-minimisation`
+  (strict), `aggressive-nsec`, `prefetch-key`, `val-clean-additional`.
+- Left off on purpose: `harden-algo-downgrade` (breaks `.top` while that zone
+  publishes a stale DS) and `use-caps-for-id` (0x20 casing breaks some authoritative
+  servers).
+- Admin already spoke HTTPS on loopback with a self-signed RSA-4096 cert. TLS 1.0/1.1
+  were refused. dnsdist terminates DoT/DoH for clients separately.
+
+### What this repo adds
+
+1. **Admin TLS lock-down** in `docker-compose.yml`:
+   - `FTLCONF_webserver_port=80or,443os` — HTTP redirects to HTTPS when the cert is present.
+   - `FTLCONF_webserver_tls_validity=0` — FTL will not overwrite a custom cert.
+   - `FTLCONF_webserver_advancedOpts` — `ssl_protocol_version=4` (TLS 1.2+) and an
+     AEAD-only `ssl_cipher_list` for the mbedTLS build inside FTL. Weak CBC/SHA-1
+     suites (for example `ECDHE-RSA-AES128-SHA`) are no longer offered.
+2. **Cert generator**: `scripts/harden-pihole-tls.sh` writes an ECDSA P-384
+   (or RSA-4096) cert into `etc-pihole/tls.pem`. Pass extra names at generate time;
+   nothing Tailscale-specific is committed:
+
+```bash
+ADMIN_TLS_DNS=your-host.your-tailnet.ts.net \
+ADMIN_TLS_IP=127.0.0.1,${LAN_IPV4},${TAILSCALE_IPV4} \
+./scripts/harden-pihole-tls.sh
+docker compose up -d pihole
+```
+
+3. **Unbound**: `val-clean-additional: yes` and clearer comments around the
+   intentional tradeoffs above. No change to the dnscrypt-proxy upstream.
+
+### Threat model (honest)
+
+| Risk | Mitigation |
+|------|------------|
+| Someone on the LAN sniffs the admin password | HTTPS + redirect; admin ACL stays loopback / Docker / Tailscale Serve |
+| Downgrade to TLS 1.0 or a CBC suite | `ssl_protocol_version=4` + AEAD cipher list |
+| Forged / stripped DNS answers | Unbound DNSSEC validation + harden-* flags |
+| ISP or Wi-Fi sees plaintext queries | dnscrypt-proxy via anonymizing relays (already in place) |
+| Third party builds a query log about you | Kept off the table: no DoH/DoT to Cloudflare/Google/Quad9 as upstream |
+
+This is current best practice for a self-hosted blocker. It is not a claim about
+any agency's capability.
 
 ## Encrypted DNS and Tailscale
 
