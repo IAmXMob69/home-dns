@@ -1,0 +1,6 @@
+[Unit]
+Description=Indian CA DNS tripwire (read-only Pi-hole query watcher)
+
+[Service]
+Type=oneshot
+ExecStart=%h/home-dns/scripts/ca-tripwire.py

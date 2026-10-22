@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Indian CA DNS tripwire periodically
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+Persistent=true
+AccuracySec=15s
+
+[Install]
+WantedBy=timers.target

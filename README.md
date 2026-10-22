@@ -193,6 +193,31 @@ It does not touch `docker-compose.yml`.
 This is current best practice for a self-hosted blocker. It is not a claim about
 any agency's capability.
 
+### Attempt tripwire (optional)
+
+A read-only monitor that records when a device still tries to look up one of the blocked certificate-authority domains, so you can tell whether anything on the network is attempting to reach them. It is a logging tripwire, not an attack tool: it only reads Pi-hole's query database, writes to a local log, and sends nothing to anyone.
+
+- `scripts/ca-tripwire.py` reads Pi-hole's long-term query database (`pihole-FTL.db`) read-only, matches the certificate-authority deny rules from `privacy-shield/privacy-shield.tsv`, and appends one line per new attempt to `$HOME/.local/share/ca-tripwire/hits.log`. Each line is tab-separated: ISO-8601 time, client IP, client hostname (or `-`), domain. A cursor file beside the log keeps its place, so each attempt is recorded once. The first run only notes where it is and watches from there, so installing it does not replay old history.
+- The log is the interface. A desktop notifier tails that file and raises the alerts; the watcher itself never notifies.
+- It reaches the database through the `pihole` container (`docker exec`, no root). Override `CA_TRIPWIRE_CONTAINER` / `CA_TRIPWIRE_DB`, or set `CA_TRIPWIRE_FTL_DB` to read a host-side database directly, if your setup differs.
+
+Run it on a timer with systemd user units (no root):
+
+```sh
+cp automation/ca-tripwire/ca-tripwire.service automation/ca-tripwire/ca-tripwire.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now ca-tripwire.timer
+```
+
+The units expect the checkout at `~/home-dns`; adjust the `ExecStart` path if yours differs. Test it:
+
+```sh
+dig @127.0.0.1 emsign.com
+# wait for Pi-hole to flush the query to its long-term database (up to a minute), then:
+systemctl --user start ca-tripwire.service
+cat "$HOME/.local/share/ca-tripwire/hits.log"
+```
+
 ## Encrypted DNS and Tailscale
 
 `install.sh` gives dnsdist a self-signed `pihole.lan` certificate. On a Tailscale node, get a real one:
