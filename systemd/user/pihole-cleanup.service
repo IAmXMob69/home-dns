@@ -1,0 +1,6 @@
+[Unit]
+Description=Drop Pi-hole junk (old gravity copies, debug logs, extra backups)
+
+[Service]
+Type=oneshot
+ExecStart=%h/home-dns/cleanup.sh

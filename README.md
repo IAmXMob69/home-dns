@@ -130,6 +130,26 @@ When `go/bin/<tool>` exists the script runs it; otherwise the shell or Python ve
 
 Geolock host extras, off unless set: `GEOLOCK_TAILSCALE_UNDERLAY=1` lets tailscaled reach any country; `GEOLOCK_APP_CGROUP=<cgroup path>` limits one app's cgroup to the listed countries (allow mode).
 
+## Linux host tools (optional)
+
+Scripts for the PC that runs the stack. Each reads its settings from `.env`
+(see the "Host tools" part of `.env.example`) and stops with a plain message if one is missing.
+
+- `sudo ./harden.sh`: firewall so DNS and the admin page answer only this PC, the LAN and Tailscale.
+- `sudo ./expose-lan.sh`: fixed LAN IP plus LAN-only DNS rules.
+- `sudo ./setup-tailscale-privileged.sh`, then `./join-tailnet.sh` and `./publish-tailscale-dns.sh`: Tailscale.
+- `sudo ./fix-pihole.sh`, `./apply-stack.sh`, `sudo ./rollback-dns.sh`: repair, re-apply, undo host DNS.
+- `./backup.sh`, `./cleanup.sh`, `watchdog.py` (DNS failover), `dns-probe.py`.
+- `automation/`: healthcheck, status, gravity and image updates, list import, privacy shield.
+- `systemd/`: example timers. See `systemd/README.md`.
+
+Settings: `WIFI_CON`, `WIFI_DEV`, `LAN_IPV4`, `LAN_CIDR`, `LAN_GATEWAY`, `LAN_IPV6_CIDR`,
+`DOT_AUTH_NAME` (or `PIHOLE_DNS`), `TS_HOSTNAME`, `TS_OPERATOR`, `PIHOLE_USER`,
+`IMPORT_LISTS_FILE`, `PIHOLE_WATCHDOG_LAN`.
+
+Country firewall zones (Linux, nftables): `sudo nft -f automation/<name>-block/<name>-block.nft`
+for `africa`, `india`, `israel`, `saudi`. They exempt `tailscaled`; drop the `socket cgroupv2` line if you do not run it.
+
 ## License
 
 Configs are as-is for personal reuse. Pi-hole, Unbound, and dnscrypt-proxy keep their own licenses.

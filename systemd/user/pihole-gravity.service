@@ -1,0 +1,6 @@
+[Unit]
+Description=Update Pi-hole gravity (webpwnized automation)
+
+[Service]
+Type=oneshot
+ExecStart=%h/home-dns/automation/update-gravity.sh

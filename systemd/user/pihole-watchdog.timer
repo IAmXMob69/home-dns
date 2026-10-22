@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Pi-hole DNS every 30s (failover + self-heal)
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

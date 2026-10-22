@@ -1,0 +1,6 @@
+[Unit]
+Description=Pull Pi-hole/Unbound Docker images (webpwnized update-pihole)
+
+[Service]
+Type=oneshot
+ExecStart=%h/home-dns/automation/update-pihole.sh

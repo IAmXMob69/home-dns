@@ -1,0 +1,6 @@
+[Unit]
+Description=Backup Pi-hole configuration
+
+[Service]
+Type=oneshot
+ExecStart=%h/home-dns/backup.sh

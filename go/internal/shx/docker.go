@@ -96,9 +96,17 @@ func MustDocker(args ...string) {
 	}
 }
 
+// SessionBus is $DBUS_SESSION_BUS_ADDRESS, else this user's bus socket.
+func SessionBus() string {
+	if v := os.Getenv("DBUS_SESSION_BUS_ADDRESS"); v != "" {
+		return v
+	}
+	return fmt.Sprintf("unix:path=/run/user/%d/bus", os.Getuid())
+}
+
 // Notify mirrors DISPLAY=:0.0 DBUS_SESSION_BUS_ADDRESS=... notify-send -a Pi-hole T B >/dev/null 2>&1 || true.
 func Notify(title, body string) {
-	env := append(os.Environ(), "DISPLAY=:0.0", "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus")
+	env := append(os.Environ(), "DISPLAY=:0.0", "DBUS_SESSION_BUS_ADDRESS="+SessionBus())
 	Cmd{Argv: []string{"notify-send", "-a", "Pi-hole", title, body}, Env: env, Stdout: io.Discard, Stderr: io.Discard}.Run()
 }
 

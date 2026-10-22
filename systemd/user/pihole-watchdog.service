@@ -1,0 +1,8 @@
+[Unit]
+Description=Fail over DNS if Pi-hole stops answering
+
+[Service]
+Type=oneshot
+SuccessExitStatus=0 1
+# Go build if present, else the Python original.
+ExecStart=/bin/bash -c 'if [ -x %h/home-dns/go/bin/watchdog ]; then exec %h/home-dns/go/bin/watchdog; else exec /usr/bin/python3 %h/home-dns/watchdog.py; fi'

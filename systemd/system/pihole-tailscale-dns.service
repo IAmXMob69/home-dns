@@ -1,0 +1,17 @@
+# Edit YOUR_USER and the path, then: sudo cp to /etc/systemd/system/ && sudo systemctl enable --now pihole-tailscale-dns
+[Unit]
+Description=Publish Pi-hole DNS on Tailscale IPv4
+After=tailscaled.service docker.service
+Wants=tailscaled.service docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=YOUR_USER
+Group=YOUR_USER
+SupplementaryGroups=docker
+WorkingDirectory=/path/to/home-dns
+ExecStart=/path/to/home-dns/publish-tailscale-dns.sh
+
+[Install]
+WantedBy=multi-user.target

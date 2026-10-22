@@ -1,0 +1,6 @@
+[Unit]
+Description=Pi-hole stack healthcheck (containers, gravity, unbound, disk)
+
+[Service]
+Type=oneshot
+ExecStart=%h/home-dns/automation/healthcheck.sh

@@ -1,6 +1,7 @@
 // Package priv holds helpers shared by the Go ports of the privileged
-// one-off scripts (install.sh, ...): the PROBE selection and wait loops,
-// and small bash/coreutils behaviours those scripts lean on. External tools (nmcli,
+// one-off scripts (install.sh, harden.sh, fix-pihole.sh, ...): the
+// lib/dot-dns.sh functions, the PROBE selection and wait loops, and small
+// bash/coreutils behaviours those scripts lean on. External tools (nmcli,
 // docker, ufw, iptables, pacman, systemctl, chown, install, ln, getent, ss,
 // curl, sleep) are still exec'd from PATH exactly as the shell did.
 package priv
@@ -15,8 +16,27 @@ import (
 	"strings"
 	"syscall"
 
+	"pihole/go/internal/conf"
 	"pihole/go/internal/shx"
 )
+
+// PiholeDir is the checkout these tools live in (PIHOLE_ROOT from the
+// shim, else two levels above the binary).
+func PiholeDir() string { return shx.Root() }
+
+// Owner is the login that owns the checkout: PIHOLE_USER, else SUDO_USER.
+// It exits with a message when neither is set.
+func Owner() string {
+	if u := conf.Get("PIHOLE_USER", os.Getenv("SUDO_USER")); u != "" && u != "root" {
+		return u
+	}
+	return conf.Need("PIHOLE_USER", conf.HintUser)
+}
+
+// NetLink returns WIFI_CON and WIFI_DEV, or exits explaining them.
+func NetLink() (con, dev string) {
+	return conf.Need("WIFI_CON", conf.HintWifiCon), conf.Need("WIFI_DEV", conf.HintWifiDev)
+}
 
 // Access mirrors bash [[ -x / -r ]] (access(2), so root sees any x bit).
 func Access(p string, mode uint32) bool { return syscall.Access(p, mode) == nil }
@@ -266,4 +286,56 @@ func Iptables(tool string, rules [][]string) {
 // SortNR mirrors sort -nr for plain integer lines.
 func SortNR(nums []string) {
 	sort.SliceStable(nums, func(i, j int) bool { return shx.BashInt(nums[i]) > shx.BashInt(nums[j]) })
+}
+
+// DotDNS mirrors lib/dot-dns.sh: settings are read once, up front, so a
+// missing one stops the tool before it changes anything.
+type DotDNS struct{ PiholeDNS, CloudflareDNS, Con, Dev string }
+
+func NewDotDNS() DotDNS {
+	d := DotDNS{CloudflareDNS: conf.Get("CLOUDFLARE_DOT_DNS", "1.1.1.1#cloudflare-dns.com,8.8.8.8#dns.google")}
+	d.Con, d.Dev = NetLink()
+	d.PiholeDNS = conf.Get("PIHOLE_DNS", "")
+	if d.PiholeDNS == "" {
+		d.PiholeDNS = "127.0.0.1#" + conf.Need("DOT_AUTH_NAME", conf.HintDotName)
+	}
+	return d
+}
+
+// runSeq executes commands like a bash function body. With errexit a
+// failure exits the tool; without (called as `f || true`) it keeps going
+// and returns the last command's status.
+func runSeq(errexit bool, cmds ...[]string) int {
+	rc := 0
+	for _, c := range cmds {
+		rc = R(c...)
+		if rc != 0 && errexit {
+			shx.Fail(rc)
+		}
+	}
+	return rc
+}
+
+func (d DotDNS) reapply(errexit bool, fallback ...[]string) int {
+	if Q("nmcli", "device", "reapply", d.Dev) == 0 {
+		return 0
+	}
+	return runSeq(errexit, fallback...)
+}
+
+// FailoverPublic mirrors failover_public_dns.
+func (d DotDNS) FailoverPublic(errexit bool) int {
+	runSeq(errexit, []string{"nmcli", "connection", "modify", d.Con, "ipv4.dns", d.CloudflareDNS, "connection.dns-over-tls", "yes"})
+	return d.reapply(errexit,
+		[]string{"resolvectl", "dns", d.Dev, "1.1.1.1#cloudflare-dns.com", "8.8.8.8#dns.google"},
+		[]string{"resolvectl", "dnsovertls", d.Dev, "yes"})
+}
+
+// RestorePihole mirrors restore_pihole_dns.
+func (d DotDNS) RestorePihole(errexit bool) int {
+	runSeq(errexit, []string{"nmcli", "connection", "modify", d.Con, "ipv4.dns", d.PiholeDNS, "ipv6.dns", "",
+		"ipv4.ignore-auto-dns", "yes", "ipv6.ignore-auto-dns", "yes", "connection.dns-over-tls", "yes"})
+	return d.reapply(errexit,
+		[]string{"resolvectl", "dns", d.Dev, d.PiholeDNS},
+		[]string{"resolvectl", "dnsovertls", d.Dev, "yes"})
 }

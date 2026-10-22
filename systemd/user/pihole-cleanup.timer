@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily Pi-hole cleanup at 05:30 (after gravity)
+
+[Timer]
+OnCalendar=*-*-* 05:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

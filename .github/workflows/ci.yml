@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: shellcheck
-        run: shellcheck install.sh scripts/*.sh
+        run: shellcheck install.sh scripts/*.sh *.sh lib/*.sh automation/*.sh
       - name: yamllint
         run: |
           pip install "yamllint==${YAMLLINT_VERSION}"

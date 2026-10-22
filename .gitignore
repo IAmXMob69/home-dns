@@ -14,3 +14,5 @@ __pycache__/
 dnsdist/tls.key
 dnsdist/tls.pem
 go/bin/
+pihole-automation/
+state/

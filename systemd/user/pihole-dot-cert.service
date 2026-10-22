@@ -1,0 +1,6 @@
+[Unit]
+Description=Refresh Pi-hole DoT/DoH Tailscale certificate
+
+[Service]
+Type=oneshot
+ExecStart=%h/home-dns/scripts/refresh-dot-cert.sh

@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly refresh of Pi-hole DoT/DoH certificate
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+RandomizedDelaySec=1h
+
+[Install]
+WantedBy=timers.target

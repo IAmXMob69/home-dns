@@ -4,7 +4,8 @@ NICE    := nice -n19 ionice -c3
 export GOMAXPROCS := 2
 export CGO_ENABLED := 0
 GOFLAGS_BUILD := -p 2 -trimpath -ldflags "-s -w"
-TOOLS := pihole-install geolock-apply malice-ip-apply pihole-groups pihole-exporter refresh-dot-cert
+TOOLS := pihole-install geolock-apply malice-ip-apply pihole-groups pihole-exporter refresh-dot-cert \
+	apply-stack backup cleanup debug-window-off dns-probe expose-lan fix-pihole harden healthcheck import-lists import-webpwnized-lists install-privacy-shield join-tailnet publish-tailscale-dns rollback-dns setup-tailscale-privileged status update-gravity update-pihole watchdog
 IMAGE   ?= pihole-pihole-exporter
 
 .PHONY: all build test vet clean image
