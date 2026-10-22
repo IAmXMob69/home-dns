@@ -130,14 +130,17 @@ echo
 print_settings
 cat <<'NEXT'
 
-Apply on the machine that runs the stack (no sudo if your user can talk to Docker):
+This script only writes the cert under etc-pihole/. It does not edit
+docker-compose.yml. Merge the three FTLCONF lines above into your running
+compose if they are missing — do not overwrite the whole file (that can wipe
+unrelated hardening). Then:
 
-  # 1. Make sure docker-compose.yml has the three FTLCONF lines above, then:
   docker compose up -d pihole
 
-  # 2. Confirm TLS 1.2+ and that weak CBC suites are gone:
+Confirm TLS 1.2+ and that weak CBC suites are gone:
+
   echo | openssl s_client -connect 127.0.0.1:443 -tls1_2 2>/dev/null | grep -E 'Protocol|Cipher'
   echo | openssl s_client -connect 127.0.0.1:443 -tls1_2 -cipher 'ECDHE-RSA-AES128-SHA' 2>&1 | grep -E 'Cipher|handshake|alert'
 
-  # 3. Open https://127.0.0.1/admin/ and accept the new certificate once.
+Open https://127.0.0.1/admin/ and accept the new certificate once.
 NEXT

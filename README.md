@@ -132,7 +132,9 @@ device → Pi-hole → Unbound (DNSSEC) → dnscrypt-proxy (anonymized DNSCrypt)
 
 ### What this repo adds
 
-1. **Admin TLS lock-down** in `docker-compose.yml`:
+1. **Admin TLS lock-down** in `docker-compose.yml` (alongside container hardening:
+   digest-pinned images, `no-new-privileges` / `pids_limit` where safe, Pi-hole
+   container DNS pointed at Unbound on `172.30.90.4`, destructive API off):
    - `FTLCONF_webserver_port=80or,443os` — HTTP redirects to HTTPS when the cert is present.
    - `FTLCONF_webserver_tls_validity=0` — FTL will not overwrite a custom cert.
    - `FTLCONF_webserver_advancedOpts` — `ssl_protocol_version=4` (TLS 1.2+) and an
@@ -146,11 +148,37 @@ device → Pi-hole → Unbound (DNSSEC) → dnscrypt-proxy (anonymized DNSCrypt)
 ADMIN_TLS_DNS=your-host.your-tailnet.ts.net \
 ADMIN_TLS_IP=127.0.0.1,${LAN_IPV4},${TAILSCALE_IPV4} \
 ./scripts/harden-pihole-tls.sh
-docker compose up -d pihole
 ```
 
 3. **Unbound**: `val-clean-additional: yes` and clearer comments around the
    intentional tradeoffs above. No change to the dnscrypt-proxy upstream.
+
+### Applying compose changes (do not blind-copy)
+
+The `docker-compose.yml` in this repo is the shared source of truth, including
+admin TLS lock-down, image digest pins, `no-new-privileges`, `pids_limit`, and
+container DNS pointed at Unbound. A running checkout may also carry local-only
+host firewall rules (for example an `inet dns_egress` nftables table) that are
+**not** in this file.
+
+**Do not** `cp` this file over a live stack. That overwrites any local hardening
+you have not merged back yet. Instead:
+
+1. `git pull` in the checkout that runs the stack (or copy only the files you
+   mean to update — never assume compose is the only one that drifted).
+2. If your live `docker-compose.yml` has diverged, merge by hand: keep the
+   `FTLCONF_webserver_*` TLS lines from this repo and keep any stronger local
+   service hardening you still need, then replace the live file with the
+   reconciled result.
+3. Recreate only after reviewing the diff:
+
+```bash
+diff -u /path/to/live/docker-compose.yml ./docker-compose.yml
+docker compose up -d pihole unbound
+```
+
+The cert script only writes `etc-pihole/tls.pem` (and prints the TLS settings).
+It does not touch `docker-compose.yml`.
 
 ### Threat model (honest)
 

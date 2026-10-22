@@ -14,7 +14,11 @@ x-logging: &default-logging
 services:
   dnscrypt:
     container_name: dnscrypt
-    image: klutchell/dnscrypt-proxy:latest
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    # dnscrypt-proxy 2.1.19, pinned by digest 2026-10-22 (no upgrade).
+    image: klutchell/dnscrypt-proxy@sha256:42c88a9f5e6486c3f0f8266286ffdac8f8d6ebb2a61f414ed57bcf129342862d
     hostname: dnscrypt
     networks:
       default:
@@ -41,7 +45,11 @@ services:
 
   unbound:
     container_name: unbound
-    image: klutchell/unbound:latest
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    # Unbound 1.26.2, pinned by digest 2026-10-22 (no upgrade).
+    image: klutchell/unbound@sha256:50cbeb32b5838a829a7226b19cb151f9535bd7f9f3190f950780f452fe807478
     hostname: unbound
     networks:
       default:
@@ -60,8 +68,6 @@ services:
       - ./unbound/custom.conf.d:/etc/unbound/custom.conf.d:ro
       # Host CA bundle, copied by install.sh (Debian/Ubuntu/Arch paths differ).
       - ./unbound/ca-certificates.crt:/etc/unbound/ca-certificates.crt:ro
-      - ./unbound/tls.key:/etc/unbound/tls.key:ro
-      - ./unbound/tls.pem:/etc/unbound/tls.pem:ro
     healthcheck:
       test: ["CMD", "drill", "@127.0.0.1", "dnssec.works"]
       interval: 30s
@@ -71,7 +77,11 @@ services:
 
   pihole:
     container_name: pihole
-    image: pihole/pihole:2026.10.0
+    # No no-new-privileges here: FTL gets its caps from setcap file caps,
+    # which no-new-privileges blocks (tested 2026-10-22: lost NET_BIND/CHOWN).
+    pids_limit: 512
+    # Pi-hole 2026.10.0, pinned by digest 2026-10-22 (no upgrade).
+    image: pihole/pihole:2026.10.0@sha256:d34134716fc32038b052a8674c7c6879e0ff21f0e6d8af345166fffa2c27c113
     hostname: pihole
     networks:
       default:
@@ -93,6 +103,8 @@ services:
     environment:
       TZ: ${TZ:-UTC}
       FTLCONF_webserver_api_password: ${FTLCONF_webserver_api_password}
+      # No restart/flush calls over the API.
+      FTLCONF_webserver_api_allow_destructive: "false"
       # ALL is required inside Docker (LAN clients are not on a container-local subnet).
       # Host publish + UFW/DOCKER-USER are what stop this from being an open resolver.
       FTLCONF_dns_listeningMode: ALL
@@ -110,7 +122,8 @@ services:
       FTLCONF_dns_cache_size: "10000"
       FTLCONF_dns_rateLimit_count: "2000"
       FTLCONF_dns_rateLimit_interval: "60"
-      FTLCONF_dns_EDNS0ECS: "false"
+      # Use the client IP that dnsdist passes in ECS (DoT/DoH clients show by IP).
+      FTLCONF_dns_EDNS0ECS: "true"
       FTLCONF_dns_blocking_mode: "NULL"
       FTLCONF_dns_blocking_edns: "CODE"
       # CNAME inspect was sinking Facebook graph/gateway via star.c10r CNAME chains.
@@ -143,7 +156,7 @@ services:
       FTLCONF_ntp_sync_active: "false"
       FTLCONF_ntp_ipv4_active: "false"
       FTLCONF_ntp_ipv6_active: "false"
-      # Fair scheduler share. -20 starved Grok Bot / XFCE on this 4-core box.
+      # Fair scheduler share. -20 starved the desktop session on a 4-core host.
       FTLCONF_misc_nice: "0"
       # Admin UI is loopback/Tailscale Serve only; cut CivetWeb thread pool.
       FTLCONF_webserver_threads: "6"
@@ -158,10 +171,11 @@ services:
     mem_limit: 1g
     mem_reservation: 512m
     restart: unless-stopped
-    # Container bootstrap only. FTL upstream is Unbound, not these.
+    # Container's own lookups (list downloads) go to Unbound, never plain public DNS.
+    # Plain port-53 egress should be locked to dnscrypt only on the host
+    # (for example an nftables inet dns_egress table). Not part of compose.
     dns:
-      - 1.1.1.1
-      - 8.8.8.8
+      - 172.30.90.4
     logging: *default-logging
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1/admin/"]
@@ -172,7 +186,11 @@ services:
 
   dnsdist:
     container_name: dnsdist
-    image: powerdns/dnsdist-19:latest
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    # dnsdist 1.9.16, pinned by digest 2026-10-22 (no upgrade).
+    image: powerdns/dnsdist-19@sha256:260b1120947a10c494fad4d93cde33ebace34bf4800c88ebb114dd7f9e829809
     hostname: dnsdist
     networks:
       default:
@@ -212,6 +230,9 @@ services:
   pihole-exporter:
     profiles: ["monitoring"]
     container_name: pihole-exporter
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
     networks:
       default:
         ipv4_address: 172.30.90.3
@@ -243,10 +264,14 @@ services:
   prometheus:
     profiles: ["monitoring"]
     container_name: prometheus
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
     networks:
       default:
         ipv4_address: 172.30.90.7
-    image: prom/prometheus:latest
+    # Prometheus 3.14.0, pinned by digest 2026-10-22 (no upgrade).
+    image: prom/prometheus@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -268,10 +293,14 @@ services:
   grafana:
     profiles: ["monitoring"]
     container_name: grafana
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
     networks:
       default:
         ipv4_address: 172.30.90.6
-    image: grafana/grafana:latest
+    # Grafana 13.2.1, pinned by digest 2026-10-22 (no upgrade).
+    image: grafana/grafana@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
