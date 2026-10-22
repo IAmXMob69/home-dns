@@ -1,0 +1,44 @@
+#!/usr/bin/nft -f
+# Drop traffic to and from eMudhra's own address space.
+# Only prefixes registered to eMudhra Limited and announced by its own
+# ASNs (AS141213, AS142057) are listed. eMudhra's public sites also run on
+# shared cloud and CDN ranges (Amazon, CloudFront); those are blocked in
+# Pi-hole by name instead, never here.
+
+destroy table inet emudhra_block
+table inet emudhra_block {
+  set em4 {
+    type ipv4_addr
+    flags interval
+    auto-merge
+    elements = {
+      103.156.134.0/24,
+      103.165.181.0/24
+    }
+  }
+  set em6 {
+    type ipv6_addr
+    flags interval
+    auto-merge
+    elements = {
+      2001:df4:ef80::/48
+    }
+  }
+  chain input {
+    type filter hook input priority filter - 7; policy accept;
+    ip saddr @em4 counter drop comment "drop IPv4 from eMudhra"
+    ip6 saddr @em6 counter drop comment "drop IPv6 from eMudhra"
+  }
+  chain output {
+    type filter hook output priority filter - 7; policy accept;
+    ip daddr @em4 counter drop comment "drop IPv4 to eMudhra"
+    ip6 daddr @em6 counter drop comment "drop IPv6 to eMudhra"
+  }
+  chain forward {
+    type filter hook forward priority filter - 7; policy accept;
+    ip saddr @em4 counter drop comment "drop IPv4 from eMudhra fwd"
+    ip6 saddr @em6 counter drop comment "drop IPv6 from eMudhra fwd"
+    ip daddr @em4 counter drop comment "drop IPv4 to eMudhra fwd"
+    ip6 daddr @em6 counter drop comment "drop IPv6 to eMudhra fwd"
+  }
+}

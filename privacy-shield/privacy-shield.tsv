@@ -102,4 +102,6 @@
 
 # Certificate authority lockout: eMudhra / emSign.
 3	emudhra	eMudhra (any name containing it)
-3	(^|\.)emsign\.(com|in|net)$	eMudhra emSign CA, OCSP and repository
+3	(^|\.)emsign\.(com|in|net|us)$	eMudhra emSign CA, OCSP, CRL and repository
+3	(^|\.)e-mudhra\.com$	eMudhra legacy site and OCSP
+3	(^|\.)emsigner\.com$	eMudhra emSigner signing portal
