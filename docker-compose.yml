@@ -137,7 +137,7 @@ services:
       # Longer local history once Expert unlocks privacy/history panes (still on-box only).
       FTLCONF_database_maxDBdays: "30"
       FTLCONF_database_network_expire: "30"
-      FTLCONF_webserver_api_maxHistory: "604800"
+      FTLCONF_webserver_api_maxHistory: "86400"
       FTLCONF_webserver_api_prettyJSON: "true"
       FTLCONF_misc_privacylevel: "0"
       # UI is loopback + Tailscale Serve (source 127.0.0.1). Exporter is 172.16/12.
