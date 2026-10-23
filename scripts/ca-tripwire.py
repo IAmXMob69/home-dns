@@ -87,7 +87,7 @@ def load_ca_patterns():
         try:
             patterns.append(re.compile(parts[1].strip(), re.IGNORECASE))
         except re.error as exc:
-            print("ca-tripwire: skipping invalid regex %r: %s" % (parts[1], exc),
+            print(f"ca-tripwire: skipping invalid regex {parts[1]!r}: {exc}",
                   file=sys.stderr)
     if not patterns:
         sys.exit("ca-tripwire: no certificate-authority rules in " + str(TSV))
@@ -97,7 +97,7 @@ def load_ca_patterns():
 def _run(sql):
     """Run one read-only query; return rows as lists of text fields."""
     if HOST_DB:
-        uri = "file:%s?mode=ro&immutable=1" % Path(HOST_DB).expanduser()
+        uri = f"file:{Path(HOST_DB).expanduser()}?mode=ro&immutable=1"
         con = sqlite3.connect(uri, uri=True, timeout=10)
         try:
             return [["" if v is None else str(v) for v in row]
@@ -112,7 +112,8 @@ def _run(sql):
         cmd = (["docker", "exec", CONTAINER] + shell
                + ["-readonly", "-separator", "\t", DB, sql])
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            proc = subprocess.run(cmd, check=False, capture_output=True,
+                                  text=True, timeout=30)
         except FileNotFoundError:
             sys.exit("ca-tripwire: docker not found on PATH")
         if proc.returncode == 0:
@@ -155,7 +156,7 @@ def main():
         # does not replay history already in the database.
         baseline = int(_run(_MAXID)[0][0])
         CURSOR.write_text(str(baseline))
-        print("ca-tripwire: baseline set at query id %d" % baseline)
+        print(f"ca-tripwire: baseline set at query id {baseline:d}")
         return 0
 
     rows = _run(_ROWS % cursor)
@@ -174,11 +175,11 @@ def main():
             if not any(p.search(domain.lower()) for p in patterns):
                 continue
             host = row[3] if row[3] else "-"
-            log.write("%s\t%s\t%s\t%s\n" % (_iso(row[1]), row[2], host, domain))
+            log.write(f"{_iso(row[1])}\t{row[2]}\t{host}\t{domain}\n")
             hits += 1
     if highest > cursor:
         CURSOR.write_text(str(highest))
-    print("ca-tripwire: examined through id %d, logged %d hit(s)" % (highest, hits))
+    print(f"ca-tripwire: examined through id {highest:d}, logged {hits:d} hit(s)")
     return 0
 
 
