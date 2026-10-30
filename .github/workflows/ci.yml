@@ -120,6 +120,8 @@ jobs:
               cmp "$RUNNER_TEMP/bash.nft" "$RUNNER_TEMP/geo/geolock.nft"
             done
           done
+      - name: geolock skips absent cgroups and keeps the IPv6 no-list record (Bash and Go agree)
+        run: sudo env "PATH=$PATH" bash tests/geolock-apply-test.sh
       - name: geolock in a throwaway netns (DNS probes, IPv4/IPv6, rollback, counters)
         run: |
           (cd go && go build -o bin/geolock-apply ./cmd/geolock-apply)

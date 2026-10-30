@@ -108,7 +108,9 @@ chmod 755 "$CACHE"
 fetch_cc() {
   local cc="$1" fam="$2" out="$CACHE/$1.$2" tmp what="${1^^}"
   [[ "$fam" == "v6" ]] && what="${cc^^} IPv6"
-  if [[ $REFRESH -eq 0 && -s "$out" ]] \
+  # A fresh list is used as is. For IPv6 an empty file is a fresh cached
+  # record that the country has no list upstream.
+  if [[ $REFRESH -eq 0 && -f "$out" ]] && [[ -s "$out" || "$fam" == "v6" ]] \
     && [[ -z "$(find "$out" -mtime +"$GEOLOCK_MAX_AGE_DAYS" 2>/dev/null)" ]]; then
     return 0
   fi
@@ -144,6 +146,10 @@ fetch_cc() {
   rm -f "$tmp"
   if [[ -s "$out" ]]; then
     echo "geolock: WARNING $what download failed, keeping cached list from $(date -r "$out" '+%F')" >&2
+    return 0
+  fi
+  if [[ "$fam" == "v6" && -f "$out" ]]; then
+    echo "geolock: WARNING $what download failed, keeping the cached no-list record from $(date -r "$out" '+%F')" >&2
     return 0
   fi
   echo "geolock: ERROR $what download failed and there is no cached list" >&2
@@ -183,6 +189,21 @@ app_cg="${app_cg#"${app_cg%%[!/]*}"}"
 if [[ "$GEOLOCK_MODE" == "allow" && -n "$app_cg" ]] \
   && [[ ! "$app_cg" =~ ^[A-Za-z0-9@._:-]+(/[A-Za-z0-9@._:-]+)*$ ]]; then
   die "GEOLOCK_APP_CGROUP must be a cgroup path like user.slice/app.slice"
+fi
+# nft resolves a cgroupv2 path when the ruleset is loaded and refuses the
+# whole ruleset if that cgroup does not exist (yet), e.g. at boot before
+# tailscaled or the user's session has started. A missing cgroup has no
+# sockets, so its rules would match nothing: leave them out instead of
+# failing the geolock. GEOLOCK_CGROUP_ROOT is for tests.
+cg_root="${GEOLOCK_CGROUP_ROOT:-/sys/fs/cgroup}"
+underlay="${GEOLOCK_TAILSCALE_UNDERLAY:-0}"
+if [[ "$GEOLOCK_OUTBOUND" == "1" && "$underlay" == "1" && ! -d "$cg_root/system.slice/tailscaled.service" ]]; then
+  echo "geolock: WARNING cgroup system.slice/tailscaled.service does not exist; leaving out the tailscale underlay rule" >&2
+  underlay=0
+fi
+if [[ "$GEOLOCK_OUTBOUND" == "1" && "$GEOLOCK_MODE" == "allow" && -n "$app_cg" && ! -d "$cg_root/$app_cg" ]]; then
+  echo "geolock: WARNING cgroup $app_cg does not exist; leaving out its rules (re-run the geolock once it exists)" >&2
+  app_cg=""
 fi
 
 v6=0
@@ -267,7 +288,7 @@ trap 'rm -rf "$tmp_nft" "$lists"' EXIT
     #   GEOLOCK_APP_CGROUP=<path>     allow mode: that cgroup may only reach
     #                                 listed countries (no IPv6 unless
     #                                 GEOLOCK_IPV6=1)
-    if [[ "${GEOLOCK_TAILSCALE_UNDERLAY:-0}" == "1" ]]; then
+    if [[ "$underlay" == "1" ]]; then
       echo '    socket cgroupv2 level 2 "system.slice/tailscaled.service" accept comment "tailscale underlay"'
     fi
     if [[ "$GEOLOCK_MODE" == "allow" && -n "$app_cg" ]]; then

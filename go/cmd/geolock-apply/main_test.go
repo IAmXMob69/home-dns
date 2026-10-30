@@ -2,8 +2,12 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseSettings(t *testing.T) {
@@ -153,5 +157,72 @@ func TestCheckCgroup(t *testing.T) {
 		if CheckCgroup(bad) == nil {
 			t.Errorf("%q accepted", bad)
 		}
+	}
+}
+
+func TestPresentCgroups(t *testing.T) {
+	root := t.TempDir()
+	var warn bytes.Buffer
+	u, cg := PresentCgroups(root, true, "user.slice/app.slice", "allow", true, &warn)
+	if u || cg != "" || strings.Count(warn.String(), "WARNING") != 2 {
+		t.Fatalf("missing cgroups kept: %v %q %q", u, cg, warn.String())
+	}
+	for _, d := range []string{"system.slice/tailscaled.service", "user.slice/app.slice"} {
+		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	warn.Reset()
+	u, cg = PresentCgroups(root, true, "user.slice/app.slice", "allow", true, &warn)
+	if !u || cg != "user.slice/app.slice" || warn.Len() != 0 {
+		t.Fatalf("present cgroups dropped: %v %q %q", u, cg, warn.String())
+	}
+	// No output chain, or deny mode: nothing to check and nothing to warn about.
+	u, cg = PresentCgroups(t.TempDir(), false, "x.slice", "deny", true, &warn)
+	if u || cg != "x.slice" || warn.Len() != 0 {
+		t.Fatalf("deny mode: %v %q %q", u, cg, warn.String())
+	}
+	u, _ = PresentCgroups(t.TempDir(), true, "", "allow", false, &warn)
+	if !u || warn.Len() != 0 {
+		t.Fatalf("outbound off: %v %q", u, warn.String())
+	}
+}
+
+// An empty IPv6 cache file records "no list upstream". It must count as a
+// cached list: reused while fresh, and kept when a download fails.
+func TestFetchCCv6EmptyRecord(t *testing.T) {
+	if _, err := exec.LookPath("curl"); err != nil {
+		t.Skip("curl not installed")
+	}
+	// Port 9 on loopback: connection refused, like a boot with no network
+	// (a missing file:// path would instead read as "no list upstream").
+	const down = "http://127.0.0.1:9"
+	cache := t.TempDir()
+	rec := filepath.Join(cache, "zz.v6")
+	if err := os.WriteFile(rec, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !fetchCC("zz", "v6", cache, down, "7", false) {
+		t.Fatal("fresh empty IPv6 record was not reused")
+	}
+	if !fetchCC("zz", "v6", cache, down, "7", true) {
+		t.Fatal("--refresh with no network dropped the empty IPv6 record")
+	}
+	old := time.Now().Add(-30 * 24 * time.Hour)
+	if err := os.Chtimes(rec, old, old); err != nil {
+		t.Fatal(err)
+	}
+	if !fetchCC("zz", "v6", cache, down, "7", false) {
+		t.Fatal("stale empty IPv6 record not kept on a failed download")
+	}
+	if st, err := os.Stat(rec); err != nil || st.Size() != 0 {
+		t.Fatalf("record changed: %v %v", st, err)
+	}
+	// An empty IPv4 file is never a valid cache.
+	if err := os.WriteFile(filepath.Join(cache, "zz.v4"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if fetchCC("zz", "v4", cache, down, "7", false) {
+		t.Fatal("empty IPv4 cache accepted")
 	}
 }
