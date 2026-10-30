@@ -89,17 +89,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go/go.mod
       - name: install nftables
         run: sudo apt-get update -qq && sudo apt-get install -y -qq nftables
-      - name: geolock ruleset builds and passes nft -c
+      - name: geolock ruleset builds and passes nft -c (Bash and Go agree)
         run: |
+          (cd go && go build -o "$RUNNER_TEMP/geolock-apply" ./cmd/geolock-apply)
           printf 'GEOLOCK_ENABLED=1\nGEOLOCK_MODE=allow\nGEOLOCK_ALLOW_COUNTRIES=US,DE\n' > "$RUNNER_TEMP/allow.env"
-          sudo GEOLOCK_SETTINGS="$RUNNER_TEMP/allow.env" GEOLOCK_CACHE="$RUNNER_TEMP/geo" GEOLOCK_DRY_RUN=1 \
-            bash scripts/geolock-apply.sh
           grep '^GEOLOCK_DENY_COUNTRIES=' geolock/settings.env.example > "$RUNNER_TEMP/deny.env"
           printf 'GEOLOCK_ENABLED=1\nGEOLOCK_MODE=deny\n' >> "$RUNNER_TEMP/deny.env"
-          sudo GEOLOCK_SETTINGS="$RUNNER_TEMP/deny.env" GEOLOCK_CACHE="$RUNNER_TEMP/geo" GEOLOCK_DRY_RUN=1 \
-            bash scripts/geolock-apply.sh
+          for mode in allow deny; do
+            sudo GEOLOCK_SETTINGS="$RUNNER_TEMP/$mode.env" GEOLOCK_CACHE="$RUNNER_TEMP/geo" GEOLOCK_DRY_RUN=1 \
+              PIHOLE_NO_GO=1 bash scripts/geolock-apply.sh
+            cp "$RUNNER_TEMP/geo/geolock.nft" "$RUNNER_TEMP/$mode-bash.nft"
+            sudo GEOLOCK_SETTINGS="$RUNNER_TEMP/$mode.env" GEOLOCK_CACHE="$RUNNER_TEMP/geo" GEOLOCK_DRY_RUN=1 \
+              PIHOLE_ROOT="$PWD" "$RUNNER_TEMP/geolock-apply"
+            cmp "$RUNNER_TEMP/$mode-bash.nft" "$RUNNER_TEMP/geo/geolock.nft"
+          done
       - name: malice ruleset loads in a throwaway netns
         run: |
           curl -fsSL -o "$RUNNER_TEMP/level1.netset" \
