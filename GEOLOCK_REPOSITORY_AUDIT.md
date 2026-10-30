@@ -86,10 +86,10 @@ path).
 | Table | Sets | Chains (priority) | Notes |
 |---|---|---|---|
 | `inet geolock` | `pass4` (127/8, 10/8, 172.16/12, 192.168/16, 100.64/10), `listed4` | input, forward, output | **IPv4 only**: `ip saddr`/`ip daddr` matches on `GEOLOCK_PORTS` (53,853). Forward uses `ct status dnat ... ct original proto-dst` to catch Docker-published DNS. Optional tailscaled underlay accept and an app cgroup rule (allow mode). |
-| `inet india_block` | `in4`, `in6` (interval, auto-merge) | output (-10), forward (-10) | `automation/india-block/india-block.nft:10052-10065` |
-| `inet africa_block` | `in4`, `in6` | output (-9), forward (-9) | `automation/africa-block/africa-block.nft:213-226` |
-| `inet israel_block` | `in4`, `in6` | output (-8), forward (-8) | `automation/israel-block/israel-block.nft:50-63` |
-| `inet saudi_block` | `in4`, `in6` | output (-7), forward (-7) | `automation/saudi-block/saudi-block.nft:38-51` |
+| `inet india_block` | `in4`, `in6` (interval, auto-merge) | input, output, forward (-10) | `automation/india-block/india-block.nft:10054-10070`: all traffic to the country out/forwarded; DNS (53/853/8443) from it in, incl. Docker DNAT |
+| `inet africa_block` | `in4`, `in6` | input, output, forward (-9) | `automation/africa-block/africa-block.nft:215-231`: all traffic to the country out/forwarded; DNS (53/853/8443) from it in, incl. Docker DNAT |
+| `inet israel_block` | `in4`, `in6` | input, output, forward (-8) | `automation/israel-block/israel-block.nft:52-68`: all traffic to the country out/forwarded; DNS (53/853/8443) from it in, incl. Docker DNAT |
+| `inet saudi_block` | `in4`, `in6` | input, output, forward (-7) | `automation/saudi-block/saudi-block.nft:40-56`: all traffic to the country out/forwarded; DNS (53/853/8443) from it in, incl. Docker DNAT |
 | `inet india_ca_block` | `ca4`, `ca6` | input, output, forward (-7) | `automation/india-ca-block/india-ca-block.nft:34-49` |
 | `inet malice_block` | IPv4 | generated | `scripts/malice-ip-apply.sh:31-45` (`ipaddress.ip_network(strict=False)`, i.e. it masks host bits by design; Go mirrors it at `go/cmd/malice-ip-apply/main.go:47-68`) |
 | `inet dns_egress` | - | - | live only, mentioned at `README.md:161`, not in the repo |
