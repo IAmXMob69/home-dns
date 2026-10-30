@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"pihole/go/internal/cidr"
 	"pihole/go/internal/shx"
 )
 
@@ -30,8 +31,7 @@ var (
 	rePorts  = regexp.MustCompile(`^[0-9]+(,[0-9]+)*$`)
 	reNum    = regexp.MustCompile(`^[0-9]+$`)
 	reCC     = regexp.MustCompile(`^[a-z]{2}$`)
-	reDigit  = regexp.MustCompile(`^[0-9]`)
-	reCIDR4  = regexp.MustCompile(`^[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}$`)
+	reCgroup = regexp.MustCompile(`^[A-Za-z0-9@._:-]+(/[A-Za-z0-9@._:-]+)*$`)
 	settings = map[string]string{
 		"GEOLOCK_ENABLED": "0", "GEOLOCK_MODE": "allow", "GEOLOCK_ALLOW_COUNTRIES": "US,DE",
 		"GEOLOCK_DENY_COUNTRIES": "", "GEOLOCK_PORTS": "53,853", "GEOLOCK_MAX_AGE_DAYS": "7",
@@ -190,27 +190,24 @@ func Ruleset(mode, ports string, underlay bool, appCg string, lists [][]byte) []
 	return b.Bytes()
 }
 
-// FilterList mirrors grep -E '^[0-9]' plus the CIDR validity check.
-// It returns the filtered bytes, grep's "matched" flag and whether every
-// kept line is a plain IPv4 CIDR.
-func FilterList(raw []byte) ([]byte, bool, bool) {
-	var out bytes.Buffer
-	matched, valid := false, true
-	lines := bytes.Split(raw, []byte("\n"))
-	if len(lines) > 0 && len(lines[len(lines)-1]) == 0 {
-		lines = lines[:len(lines)-1]
+// FilterList mirrors `cidr_filter v4` (lib/cidr.sh): every non-comment
+// line must be a strict IPv4 prefix (see internal/cidr), or the whole list
+// is rejected. It returns one prefix per line, newline-terminated.
+func FilterList(raw []byte) ([]byte, error) {
+	ps, err := cidr.ParseList(raw, cidr.V4)
+	if err != nil {
+		return nil, err
 	}
-	for _, l := range lines {
-		if reDigit.Match(l) {
-			matched = true
-			out.Write(l)
-			out.WriteByte('\n')
-			if !reCIDR4.Match(l) {
-				valid = false
-			}
-		}
+	return []byte(strings.Join(ps, "\n") + "\n"), nil
+}
+
+// CheckCgroup mirrors the GEOLOCK_APP_CGROUP check: path segments of
+// [A-Za-z0-9@._:-], so the value cannot break out of the nft string.
+func CheckCgroup(cg string) error {
+	if !reCgroup.MatchString(cg) {
+		return fmt.Errorf("GEOLOCK_APP_CGROUP must be a cgroup path like user.slice/app.slice")
 	}
-	return out.Bytes(), matched, valid
+	return nil
 }
 
 // stale mirrors [[ -n $(find out -mtime +N) ]].
@@ -229,8 +226,11 @@ func fetchCC(cc, cache, urlBase, maxAge string, refresh bool) bool {
 	tmp := shx.MustTemp(filepath.Join(cache, "."+cc+".XXXXXX"))
 	var body bytes.Buffer
 	rc := shx.Cmd{Argv: []string{"curl", "-fsSL", "--retry", "2", "--max-time", "60", urlBase + "/" + cc + "/ipv4-aggregated.txt"}, Stdout: &body}.Run()
-	filtered, matched, valid := FilterList(body.Bytes())
-	if err := os.WriteFile(tmp, filtered, 0o600); err == nil && rc == 0 && matched && len(filtered) > 0 && valid {
+	filtered, ferr := FilterList(body.Bytes())
+	if rc == 0 && ferr != nil {
+		fmt.Fprintf(os.Stderr, "cidr: %v\n", ferr)
+	}
+	if err := os.WriteFile(tmp, filtered, 0o600); err == nil && rc == 0 && ferr == nil {
 		shx.Chmod(0o644, tmp)
 		shx.MvF(tmp, out)
 		return true
@@ -302,16 +302,29 @@ func run() int {
 		die("not applying; fix the downloads above and re-run")
 	}
 
-	tmpNft := shx.MustTemp(cache + "/.geolock.XXXXXX.nft")
-	clear := shx.Trap(func() { os.Remove(tmpNft) })
+	// Re-check every cached list before use: caches written by older,
+	// laxer versions (or damaged on disk) must never reach nft.
 	var lists [][]byte
 	for _, cc := range codes {
-		l, err := os.ReadFile(filepath.Join(cache, cc+".v4"))
+		raw, err := os.ReadFile(filepath.Join(cache, cc+".v4"))
+		var l []byte
+		if err == nil {
+			l, err = FilterList(raw)
+		}
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "sed: can't read %s: No such file or directory\n", filepath.Join(cache, cc+".v4"))
+			fmt.Fprintf(os.Stderr, "cidr: %v\n", err)
+			die("cached %s list failed validation; nothing changed (try --refresh)", strings.ToUpper(cc))
 		}
 		lists = append(lists, l)
 	}
+	appCg := strings.TrimLeft(os.Getenv("GEOLOCK_APP_CGROUP"), "/")
+	if mode == "allow" && appCg != "" {
+		if err := CheckCgroup(appCg); err != nil {
+			die("%s", err)
+		}
+	}
+	tmpNft := shx.MustTemp(cache + "/.geolock.XXXXXX.nft")
+	clear := shx.Trap(func() { os.Remove(tmpNft) })
 	underlay := os.Getenv("GEOLOCK_TAILSCALE_UNDERLAY") == "1"
 	if err := os.WriteFile(tmpNft, Ruleset(mode, ports, underlay, os.Getenv("GEOLOCK_APP_CGROUP"), lists), 0o600); err != nil {
 		fmt.Fprintln(os.Stderr, err)

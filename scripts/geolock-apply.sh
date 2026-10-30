@@ -20,6 +20,9 @@ DRY_RUN="${GEOLOCK_DRY_RUN:-0}"
 REFRESH=0
 [[ "${1:-}" == "--refresh" ]] && REFRESH=1
 
+# shellcheck source=lib/cidr.sh
+source "$ROOT/lib/cidr.sh"
+
 die() { echo "geolock: $*" >&2; exit 1; }
 # nft -c needs CAP_NET_ADMIN; a throwaway user+net namespace is enough.
 nft_check() {
@@ -98,10 +101,11 @@ fetch_cc() {
     return 0
   fi
   tmp="$(mktemp "$CACHE/.$cc.XXXXXX")"
-  if curl -fsSL --retry 2 --max-time 60 "$URL_BASE/$cc/ipv4-aggregated.txt" \
-      | grep -E '^[0-9]' > "$tmp" \
-    && [[ -s "$tmp" ]] \
-    && ! grep -qvE '^[0-9]{1,3}(\.[0-9]{1,3}){3}/[0-9]{1,2}$' "$tmp"; then
+  # Every non-comment line must be a strict IPv4 prefix (lib/cidr.sh), or
+  # the whole download is refused and the cached copy stays.
+  local body
+  if body="$(curl -fsSL --retry 2 --max-time 60 "$URL_BASE/$cc/ipv4-aggregated.txt")" \
+    && cidr_filter v4 <<<"$body" > "$tmp"; then
     chmod 644 "$tmp"
     mv -f "$tmp" "$out"
     return 0
@@ -122,8 +126,23 @@ done
 # Never load a partial list: in allow mode it would cut off whole countries.
 [[ $failed -eq 0 ]] || die "not applying; fix the downloads above and re-run"
 
+# Re-check every cached list before use: caches written by older, laxer
+# versions (or damaged on disk) must never reach nft.
+lists="$(mktemp -d "$CACHE/.lists.XXXXXX")"
+trap 'rm -rf "$lists"' EXIT
+for cc in "${codes[@]}"; do
+  cidr_filter v4 < "$CACHE/$cc.v4" > "$lists/$cc" \
+    || die "cached ${cc^^} list failed validation; nothing changed (try --refresh)"
+done
+app_cg="${GEOLOCK_APP_CGROUP:-}"
+app_cg="${app_cg#"${app_cg%%[!/]*}"}"
+if [[ "$GEOLOCK_MODE" == "allow" && -n "$app_cg" ]] \
+  && [[ ! "$app_cg" =~ ^[A-Za-z0-9@._:-]+(/[A-Za-z0-9@._:-]+)*$ ]]; then
+  die "GEOLOCK_APP_CGROUP must be a cgroup path like user.slice/app.slice"
+fi
+
 tmp_nft="$(mktemp "$CACHE/.geolock.XXXXXX.nft")"
-trap 'rm -f "$tmp_nft"' EXIT
+trap 'rm -rf "$tmp_nft" "$lists"' EXIT
 {
   echo '#!/usr/bin/nft -f'
   # "table; delete table" works on every nft (destroy needs nft >= 1.0.8).
@@ -142,7 +161,7 @@ trap 'rm -f "$tmp_nft"' EXIT
   echo '    auto-merge'
   echo '    elements = {'
   for cc in "${codes[@]}"; do
-    sed 's/^/      /; s/$/,/' "$CACHE/$cc.v4"
+    sed 's/^/      /; s/$/,/' "$lists/$cc"
   done
   echo '    }'
   echo '  }'
@@ -177,8 +196,7 @@ trap 'rm -f "$tmp_nft"' EXIT
   if [[ "${GEOLOCK_TAILSCALE_UNDERLAY:-0}" == "1" ]]; then
     echo '    socket cgroupv2 level 2 "system.slice/tailscaled.service" accept comment "tailscale underlay"'
   fi
-  if [[ "$GEOLOCK_MODE" == "allow" && -n "${GEOLOCK_APP_CGROUP:-}" ]]; then
-    app_cg="${GEOLOCK_APP_CGROUP#/}"
+  if [[ "$GEOLOCK_MODE" == "allow" && -n "$app_cg" ]]; then
     IFS=/ read -ra _parts <<<"$app_cg"
     app_lvl="${#_parts[@]}"
     echo "    meta nfproto ipv6 socket cgroupv2 level ${app_lvl} \"${app_cg}\" drop"
@@ -197,6 +215,7 @@ trap 'rm -f "$tmp_nft"' EXIT
 nft_check "$tmp_nft" || die "generated ruleset failed nft -c; nothing changed"
 chmod 644 "$tmp_nft"
 mv -f "$tmp_nft" "$NFT_OUT"
+rm -rf "$lists"
 trap - EXIT
 codes_up="${codes[*]^^}"
 if [[ "$DRY_RUN" == "1" ]]; then

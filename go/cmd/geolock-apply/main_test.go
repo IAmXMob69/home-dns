@@ -59,14 +59,34 @@ func TestRuleset(t *testing.T) {
 }
 
 func TestFilterList(t *testing.T) {
-	out, m, v := FilterList([]byte("# hdr\n1.2.3.0/24\n2.0.0.0/8\n"))
-	if string(out) != "1.2.3.0/24\n2.0.0.0/8\n" || !m || !v {
-		t.Fatal(string(out), m, v)
+	out, err := FilterList([]byte("# Country: X\n#\n1.2.3.0/24\r\n\n 2.0.0.0/8\n"))
+	if err != nil || string(out) != "1.2.3.0/24\n2.0.0.0/8\n" {
+		t.Fatal(string(out), err)
 	}
-	if _, _, v := FilterList([]byte("1.2.3.4\n")); v {
-		t.Fatal("bare IP is not a CIDR")
+	for _, bad := range []string{
+		"1.2.3.4\n",                // bare IP is not a CIDR
+		"<html>\n",                 // error page
+		"# only comments\n",        // nothing to load
+		"1.2.3.0/24\n10.0.0.1/8\n", // host bits
+		"010.0.0.0/8\n",            // nft would read octal 8.0.0.0
+		"0.0.0.0/0\n",              // would match everything
+		"2001:db8::/32\n",          // wrong family
+	} {
+		if _, err := FilterList([]byte(bad)); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
 	}
-	if _, m, _ := FilterList([]byte("<html>")); m {
-		t.Fatal("no match")
+}
+
+func TestCheckCgroup(t *testing.T) {
+	for _, ok := range []string{"user.slice/app.slice", "user.slice/user-4242.slice/user@4242.service/x.slice/a-b.slice"} {
+		if CheckCgroup(ok) != nil {
+			t.Errorf("%s rejected", ok)
+		}
+	}
+	for _, bad := range []string{`a" accept comment "`, "a//b", "a b", "a/", ""} {
+		if CheckCgroup(bad) == nil {
+			t.Errorf("%q accepted", bad)
+		}
 	}
 }
