@@ -1,0 +1,81 @@
+# family	verdict	input	note
+# Each row is checked against go/internal/cidr and lib/cidr.sh (cidr_valid).
+# Escapes in input: \t tab, \r CR, \\ backslash. Input may be empty.
+v4	ok	1.2.3.0/24	plain
+v4	ok	255.255.255.255/32	max
+v4	ok	0.0.0.0/1	shortest allowed
+v4	ok	128.0.0.0/1	
+v4	ok	100.64.0.0/10	
+v4	ok	  1.2.3.0/24	leading spaces
+v4	ok	1.2.3.0/24\r	CRLF
+v4	ok	\t1.2.3.0/24\t	tabs
+v4	bad	10.0.0.1/8	host bits
+v4	bad	1.2.3.4/24	host bits
+v4	bad	0.0.0.0/0	/0
+v4	bad	1.2.3.0/33	too long
+v4	bad	1.2.3.0/024	leading zero length
+v4	bad	1.2.3.0/+24	sign
+v4	bad	010.0.0.0/8	leading zero octet (nft reads octal)
+v4	bad	01.2.3.0/24	leading zero octet
+v4	bad	256.0.0.0/8	octet range
+v4	bad	999.1.1.0/24	nft would try DNS
+v4	bad	1.2.3/24	three octets
+v4	bad	1.2.3.0.0/24	five octets
+v4	bad	1.2.3.0	bare address
+v4	bad	1.2.3.0/	empty length
+v4	bad	/24	empty address
+v4	bad	1.2.3.0/24/8	two slashes
+v4	bad	1.2.3.0 /24	inner space
+v4	bad	1.2.3.0/24 # x	inline comment
+v4	bad	2001:db8::/32	wrong family
+v4	bad	::ffff:1.2.3.0/120	mapped
+v4	bad	1.2.3.0/24,	trailing comma
+v4	bad		empty
+v4	bad	# c	comment is not a prefix
+v4	bad	１.2.3.0/24	fullwidth digit
+v4	bad	1.2.3.0/２４	fullwidth digit length
+v4	bad	0x1.2.3.0/24	hex octet
+v4	bad	1.2.3.-0/24	minus
+v6	ok	2001:db8::/32	plain
+v6	ok	2001:DB8::/32	uppercase hex
+v6	ok	2001:0db8:0000::/48	zero-padded groups
+v6	ok	::/128	all zero host
+v6	ok	::1/128	loopback
+v6	ok	fe80::/10	link-local
+v6	ok	1:2:3:4:5:6:7::/128	trailing ::
+v6	ok	::2:3:4:5:6:7:8/128	leading ::
+v6	ok	1:2:3:4:5:6:7:8/128	full
+v6	ok	ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128	max
+v6	ok	8000::/1	shortest allowed
+v6	ok	2001:db8:1234::/47	odd length
+v6	ok	 2001:db8::/32\r	whitespace
+v6	ok	::fffe:0:0/96	not mapped
+v6	ok	::ffff:0:0:0/96	ffff in group 4 is not mapped
+v6	bad	2001:db8::1/32	host bits
+v6	bad	2001:db8:1235::/47	host bit in odd length
+v6	bad	::/0	/0
+v6	bad	2001:db8::/129	too long
+v6	bad	2001:db8::/032	leading zero length
+v6	bad	fe80::1%eth0/128	zone
+v6	bad	fe80::%eth0/64	zone
+v6	bad	::ffff:0:0/96	IPv4-mapped
+v6	bad	::ffff:102:300/120	IPv4-mapped
+v6	bad	::ffff:1.2.3.0/120	dotted mapped
+v6	bad	::1.2.3.4/128	dotted compat
+v6	bad	64:ff9b::1.2.3.0/120	dotted NAT64
+v6	bad	2001:db8::	bare address
+v6	bad	2001:db8:::/48	triple colon
+v6	bad	2001::db8::/48	two ::
+v6	bad	:2001:db8::/48	leading single colon
+v6	bad	2001:db8:0:0:0:0:0:0:/128	trailing single colon
+v6	bad	1:2:3:4:5:6:7/112	seven groups
+v6	bad	1:2:3:4:5:6:7:8:9/128	nine groups
+v6	bad	1:2:3:4::5:6:7:8/128	:: with eight groups
+v6	bad	12345::/16	five hex digits
+v6	bad	g::/16	non-hex
+v6	bad	1.2.3.0/24	wrong family
+v6	bad	2001:db8::/32 # x	inline comment
+v6	bad	[2001:db8::]/32	brackets
+v6	bad		empty
+v6	bad	:/1	single colon
+v6	bad	:::/1	triple colon only
