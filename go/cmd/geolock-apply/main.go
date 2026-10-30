@@ -298,6 +298,28 @@ func CheckCgroup(cg string) error {
 	return nil
 }
 
+// PresentCgroups mirrors the cgroup check in scripts/geolock-apply.sh. nft
+// resolves a cgroupv2 path when the ruleset is loaded and refuses the whole
+// ruleset if that cgroup does not exist (yet), e.g. at boot before tailscaled
+// or the user's session has started. A missing cgroup has no sockets, so its
+// rules would match nothing: they are left out (with a warning) instead of
+// failing the geolock. It returns the underlay flag and app cgroup to render.
+func PresentCgroups(root string, underlay bool, appCg, mode string, outbound bool, warn io.Writer) (bool, string) {
+	isDir := func(p string) bool {
+		st, err := os.Stat(filepath.Join(root, p))
+		return err == nil && st.IsDir()
+	}
+	if outbound && underlay && !isDir("system.slice/tailscaled.service") {
+		fmt.Fprintln(warn, "geolock: WARNING cgroup system.slice/tailscaled.service does not exist; leaving out the tailscale underlay rule")
+		underlay = false
+	}
+	if outbound && mode == "allow" && appCg != "" && !isDir(appCg) {
+		fmt.Fprintf(warn, "geolock: WARNING cgroup %s does not exist; leaving out its rules (re-run the geolock once it exists)\n", appCg)
+		appCg = ""
+	}
+	return underlay, appCg
+}
+
 // stale mirrors [[ -n $(find out -mtime +N) ]].
 func stale(st os.FileInfo, days string) bool {
 	var n int
@@ -316,7 +338,9 @@ func what(cc, fam string) string {
 
 func fetchCC(cc, fam, cache, urlBase, maxAge string, refresh bool) bool {
 	out := filepath.Join(cache, cc+"."+fam)
-	if st, err := os.Stat(out); !refresh && err == nil && st.Size() > 0 && !stale(st, maxAge) {
+	// A fresh list is used as is. For IPv6 an empty file is a fresh cached
+	// record that the country has no list upstream.
+	if st, err := os.Stat(out); !refresh && err == nil && st.Mode().IsRegular() && (st.Size() > 0 || fam == "v6") && !stale(st, maxAge) {
 		return true
 	}
 	tmp := shx.MustTemp(filepath.Join(cache, "."+cc+".XXXXXX"))
@@ -367,6 +391,10 @@ func fetchCC(cc, fam, cache, urlBase, maxAge string, refresh bool) bool {
 	os.Remove(tmp)
 	if st, err := os.Stat(out); err == nil && st.Size() > 0 {
 		fmt.Fprintf(os.Stderr, "geolock: WARNING %s download failed, keeping cached list from %s\n", what(cc, fam), st.ModTime().Format("2006-01-02"))
+		return true
+	}
+	if st, err := os.Stat(out); fam == "v6" && err == nil && st.Mode().IsRegular() {
+		fmt.Fprintf(os.Stderr, "geolock: WARNING %s download failed, keeping the cached no-list record from %s\n", what(cc, fam), st.ModTime().Format("2006-01-02"))
 		return true
 	}
 	fmt.Fprintf(os.Stderr, "geolock: ERROR %s download failed and there is no cached list\n", what(cc, fam))
@@ -477,11 +505,13 @@ func run() int {
 			die("%s", err)
 		}
 	}
+	underlay, appCg := PresentCgroups(shx.EnvOr("GEOLOCK_CGROUP_ROOT", "/sys/fs/cgroup"),
+		os.Getenv("GEOLOCK_TAILSCALE_UNDERLAY") == "1", appCg, mode, settings["GEOLOCK_OUTBOUND"] == "1", os.Stderr)
 	tmpNft := shx.MustTemp(cache + "/.geolock.XXXXXX.nft")
 	clear := shx.Trap(func() { os.Remove(tmpNft) })
 	o := Opts{
 		Mode: mode, Ports: ports, AppCg: appCg, IPv6: ipv6,
-		Underlay: os.Getenv("GEOLOCK_TAILSCALE_UNDERLAY") == "1",
+		Underlay: underlay,
 		Inbound:  settings["GEOLOCK_INBOUND"] == "1",
 		Outbound: settings["GEOLOCK_OUTBOUND"] == "1",
 	}

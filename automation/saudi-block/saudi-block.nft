@@ -35,18 +35,22 @@ table inet saudi_block {
       2a14:9100:0000:0000:0000:0000:0000:0000/29, 2a14:de80:0000:0000:0000:0000:0000:0000/29, 2a14:e500:0000:0000:0000:0000:0000:0000/29, 2a14:f800:0000:0000:0000:0000:0000:0000/29
     }
   }
+  # Ban Saudi from this host's DNS: Pi-hole 53 tcp/udp, dnsdist DoT 853, DoH 8443.
+  # Host-local listeners hit input; Docker-published ports are DNATed and hit forward.
+  chain input {
+    type filter hook input priority filter - 7; policy accept;
+    meta l4proto { tcp, udp } th dport { 53, 853, 8443 } ip saddr @in4 counter drop comment "drop Saudi IPv4 DNS in"
+    meta l4proto { tcp, udp } th dport { 53, 853, 8443 } ip6 saddr @in6 counter drop comment "drop Saudi IPv6 DNS in"
+  }
   chain output {
     type filter hook output priority filter - 7; policy accept;
-    socket cgroupv2 level 2 "system.slice/tailscaled.service" accept comment "tailscale underlay"
     ip daddr @in4 counter drop comment "drop IPv4 Saudi"
     ip6 daddr @in6 counter drop comment "drop IPv6 Saudi"
   }
   chain forward {
     type filter hook forward priority filter - 7; policy accept;
-    iifname "tailscale0" ip daddr @in4 counter drop comment "drop IPv4 Saudi via tailscale"
-    iifname "tailscale0" ip6 daddr @in6 counter drop comment "drop IPv6 Saudi via tailscale"
-    oifname "tailscale0" ip daddr @in4 counter drop comment "drop IPv4 Saudi into tailscale"
-    oifname "tailscale0" ip6 daddr @in6 counter drop comment "drop IPv6 Saudi into tailscale"
+    ct status dnat meta l4proto { tcp, udp } ct original proto-dst { 53, 853, 8443 } ip saddr @in4 counter drop comment "drop Saudi IPv4 DNS to containers"
+    ct status dnat meta l4proto { tcp, udp } ct original proto-dst { 53, 853, 8443 } ip6 saddr @in6 counter drop comment "drop Saudi IPv6 DNS to containers"
     ip daddr @in4 counter drop comment "drop IPv4 Saudi fwd"
     ip6 daddr @in6 counter drop comment "drop IPv6 Saudi fwd"
   }

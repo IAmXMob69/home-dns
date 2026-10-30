@@ -10049,18 +10049,22 @@ table inet india_block {
       2a14:3c40:0000:0000:0000:0000:0000:0000/29
     }
   }
+  # Ban India from this host's DNS: Pi-hole 53 tcp/udp, dnsdist DoT 853, DoH 8443.
+  # Host-local listeners hit input; Docker-published ports are DNATed and hit forward.
+  chain input {
+    type filter hook input priority filter - 10; policy accept;
+    meta l4proto { tcp, udp } th dport { 53, 853, 8443 } ip saddr @in4 counter drop comment "drop India IPv4 DNS in"
+    meta l4proto { tcp, udp } th dport { 53, 853, 8443 } ip6 saddr @in6 counter drop comment "drop India IPv6 DNS in"
+  }
   chain output {
     type filter hook output priority filter - 10; policy accept;
-    socket cgroupv2 level 2 "system.slice/tailscaled.service" accept comment "tailscale underlay"
     ip daddr @in4 counter drop comment "drop IPv4 India"
     ip6 daddr @in6 counter drop comment "drop IPv6 India"
   }
   chain forward {
     type filter hook forward priority filter - 10; policy accept;
-    iifname "tailscale0" ip daddr @in4 counter drop comment "drop IPv4 India via tailscale"
-    iifname "tailscale0" ip6 daddr @in6 counter drop comment "drop IPv6 India via tailscale"
-    oifname "tailscale0" ip daddr @in4 counter drop comment "drop IPv4 India into tailscale"
-    oifname "tailscale0" ip6 daddr @in6 counter drop comment "drop IPv6 India into tailscale"
+    ct status dnat meta l4proto { tcp, udp } ct original proto-dst { 53, 853, 8443 } ip saddr @in4 counter drop comment "drop India IPv4 DNS to containers"
+    ct status dnat meta l4proto { tcp, udp } ct original proto-dst { 53, 853, 8443 } ip6 saddr @in6 counter drop comment "drop India IPv6 DNS to containers"
     ip daddr @in4 counter drop comment "drop IPv4 India fwd"
     ip6 daddr @in6 counter drop comment "drop IPv6 India fwd"
   }

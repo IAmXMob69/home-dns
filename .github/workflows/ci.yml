@@ -120,6 +120,8 @@ jobs:
               cmp "$RUNNER_TEMP/bash.nft" "$RUNNER_TEMP/geo/geolock.nft"
             done
           done
+      - name: geolock skips absent cgroups and keeps the IPv6 no-list record (Bash and Go agree)
+        run: sudo env "PATH=$PATH" bash tests/geolock-apply-test.sh
       - name: geolock in a throwaway netns (DNS probes, IPv4/IPv6, rollback, counters)
         run: |
           (cd go && go build -o bin/geolock-apply ./cmd/geolock-apply)
@@ -132,6 +134,15 @@ jobs:
             https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset
           sudo MALICE_NFT_DIR="$RUNNER_TEMP/nftables.d" MALICE_NFT_CONF=/nonexistent \
             MALICE_URL="file://$RUNNER_TEMP/level1.netset" unshare -n bash scripts/malice-ip-apply.sh
+      - name: country blocks load in a throwaway netns (no boot-time cgroup lookups)
+        run: |
+          for t in india africa israel saudi; do
+            f="automation/$t-block/$t-block.nft"
+            if grep -n cgroupv2 "$f"; then echo "$f: cgroupv2 rules fail at boot before the cgroup exists" >&2; exit 1; fi
+            grep -q 'chain input {' "$f"
+            sudo unshare -n nft -c -f "$f"
+            sudo unshare -n bash -c "nft -f '$f' && nft list table inet ${t}_block >/dev/null"
+          done
       - name: india inbound block loads in a throwaway netns
         run: |
           sudo unshare -n nft -c -f automation/india-inbound/india-inbound-block.nft

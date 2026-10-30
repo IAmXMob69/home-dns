@@ -28,7 +28,7 @@ is missing, the output doesn't change.
 ## Deploy (not done on the host yet)
 
 ```bash
-sudo install -D -m 0755 monitoring/nft-counters.py /usr/local/lib/home-dns/nft-counters.py
+sudo install -m 0755 monitoring/nft-counters.py /usr/local/sbin/home-dns-nft-counters
 sudo install -m 0644 systemd/system/home-dns-nft-counters.service systemd/system/home-dns-nft-counters.timer \
   /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -40,8 +40,8 @@ docker compose -f docker-compose.yml -f monitoring/docker-compose.nft-counters.y
 curl -s 127.0.0.1:9617/metrics | grep home_dns_nft_
 ```
 
-The service only has `CAP_NET_ADMIN`, with a read-only system except for
-`/var/lib/home-dns`, and runs every 30 s. Example queries:
+The service only has `CAP_NET_ADMIN`, with a read-only system except for its state
+directory `/var/lib/home-dns/metrics` (systemd creates it), and runs every 30 s. Example queries:
 
 ```promql
 sum by (table) (rate(home_dns_nft_drop_packets_total[5m]))
