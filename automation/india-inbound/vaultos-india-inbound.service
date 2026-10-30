@@ -1,0 +1,13 @@
+[Unit]
+Description=Vault.OS drop all inbound traffic from India (v4+v6)
+After=vaultos-country-block.service ufw.service docker.service
+Wants=vaultos-country-block.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/nft -f /etc/nftables.d/india-inbound-block.nft
+ExecStop=-/usr/bin/nft delete table inet india_inbound
+
+[Install]
+WantedBy=multi-user.target
