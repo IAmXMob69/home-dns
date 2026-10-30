@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -111,5 +112,33 @@ func TestServe(t *testing.T) {
 	r, _ := http.Get(srv.URL + "/metrics")
 	if r.Header.Get("Content-Type") != "text/plain; charset=utf-8" {
 		t.Fatal(r.Header)
+	}
+}
+
+func TestExtraMetrics(t *testing.T) {
+	t.Setenv("EXTRA_METRICS_FILE", "")
+	if ExtraMetrics() != "" {
+		t.Fatal("unset should be empty")
+	}
+	f := t.TempDir() + "/nft.prom"
+	t.Setenv("EXTRA_METRICS_FILE", f)
+	if ExtraMetrics() != "" {
+		t.Fatal("missing file should be empty")
+	}
+	if err := os.WriteFile(f, []byte("home_dns_nft_counters_up 1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := ExtraMetrics(); got != "home_dns_nft_counters_up 1\n" {
+		t.Fatalf("%q", got)
+	}
+	srv := httptest.NewServer(NewExporter())
+	defer srv.Close()
+	r, err := http.Get(srv.URL + "/metrics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(r.Body)
+	if !strings.HasSuffix(string(body), "pihole_top_blocked_domains_total Top blocked domains (gravity, regex, deny)\n# TYPE pihole_top_blocked_domains_total gauge\nhome_dns_nft_counters_up 1\n") {
+		t.Fatalf("%q", body)
 	}
 }

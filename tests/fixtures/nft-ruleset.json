@@ -1,0 +1,1009 @@
+{
+ "nftables": [
+  {
+   "metainfo": {
+    "version": "1.1.6",
+    "release_name": "fixture",
+    "json_schema_version": 1
+   }
+  },
+  {
+   "table": {
+    "family": "inet",
+    "name": "geolock",
+    "handle": 4
+   }
+  },
+  {
+   "chain": {
+    "family": "inet",
+    "table": "geolock",
+    "name": "input",
+    "handle": 1,
+    "type": "filter",
+    "hook": "input",
+    "prio": -5,
+    "policy": "accept"
+   }
+  },
+  {
+   "chain": {
+    "family": "inet",
+    "table": "geolock",
+    "name": "forward",
+    "handle": 2,
+    "type": "filter",
+    "hook": "forward",
+    "prio": -5,
+    "policy": "accept"
+   }
+  },
+  {
+   "chain": {
+    "family": "inet",
+    "table": "geolock",
+    "name": "output",
+    "handle": 3,
+    "type": "filter",
+    "hook": "output",
+    "prio": -5,
+    "policy": "accept"
+   }
+  },
+  {
+   "set": {
+    "family": "inet",
+    "name": "pass4",
+    "table": "geolock",
+    "type": "ipv4_addr",
+    "handle": 4,
+    "flags": [
+     "interval"
+    ],
+    "auto-merge": true,
+    "elem": [
+     {
+      "prefix": {
+       "addr": "10.0.0.0",
+       "len": 8
+      }
+     },
+     {
+      "prefix": {
+       "addr": "100.64.0.0",
+       "len": 10
+      }
+     },
+     {
+      "prefix": {
+       "addr": "127.0.0.0",
+       "len": 8
+      }
+     },
+     {
+      "prefix": {
+       "addr": "172.16.0.0",
+       "len": 12
+      }
+     },
+     {
+      "prefix": {
+       "addr": "192.168.0.0",
+       "len": 16
+      }
+     }
+    ]
+   }
+  },
+  {
+   "set": {
+    "family": "inet",
+    "name": "listed4",
+    "table": "geolock",
+    "type": "ipv4_addr",
+    "handle": 5,
+    "flags": [
+     "interval"
+    ],
+    "auto-merge": true,
+    "elem": [
+     {
+      "prefix": {
+       "addr": "198.51.100.0",
+       "len": 24
+      }
+     }
+    ]
+   }
+  },
+  {
+   "set": {
+    "family": "inet",
+    "name": "pass6",
+    "table": "geolock",
+    "type": "ipv6_addr",
+    "handle": 6,
+    "flags": [
+     "interval"
+    ],
+    "auto-merge": true,
+    "elem": [
+     "::1",
+     {
+      "prefix": {
+       "addr": "fc00::",
+       "len": 7
+      }
+     },
+     {
+      "prefix": {
+       "addr": "fe80::",
+       "len": 10
+      }
+     }
+    ]
+   }
+  },
+  {
+   "set": {
+    "family": "inet",
+    "name": "listed6",
+    "table": "geolock",
+    "type": "ipv6_addr",
+    "handle": 7,
+    "flags": [
+     "interval"
+    ],
+    "auto-merge": true,
+    "elem": [
+     {
+      "prefix": {
+       "addr": "2001:db8:1::",
+       "len": 48
+      }
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "input",
+    "handle": 8,
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "ip",
+         "field": "saddr"
+        }
+       },
+       "right": "@pass4"
+      }
+     },
+     {
+      "accept": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "input",
+    "handle": 11,
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "meta": {
+         "key": "l4proto"
+        }
+       },
+       "right": {
+        "set": [
+         "tcp",
+         "udp"
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "th",
+         "field": "dport"
+        }
+       },
+       "right": {
+        "set": [
+         53,
+         853
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "!=",
+       "left": {
+        "payload": {
+         "protocol": "ip",
+         "field": "saddr"
+        }
+       },
+       "right": "@listed4"
+      }
+     },
+     {
+      "counter": {
+       "packets": 3,
+       "bytes": 300
+      }
+     },
+     {
+      "drop": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "input",
+    "handle": 12,
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "ip6",
+         "field": "saddr"
+        }
+       },
+       "right": "@pass6"
+      }
+     },
+     {
+      "accept": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "input",
+    "handle": 15,
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "meta": {
+         "key": "l4proto"
+        }
+       },
+       "right": {
+        "set": [
+         "tcp",
+         "udp"
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "th",
+         "field": "dport"
+        }
+       },
+       "right": {
+        "set": [
+         53,
+         853
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "!=",
+       "left": {
+        "payload": {
+         "protocol": "ip6",
+         "field": "saddr"
+        }
+       },
+       "right": "@listed6"
+      }
+     },
+     {
+      "counter": {
+       "packets": 6,
+       "bytes": 600
+      }
+     },
+     {
+      "drop": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "forward",
+    "handle": 16,
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "ip",
+         "field": "saddr"
+        }
+       },
+       "right": "@pass4"
+      }
+     },
+     {
+      "accept": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "forward",
+    "handle": 19,
+    "expr": [
+     {
+      "match": {
+       "op": "in",
+       "left": {
+        "ct": {
+         "key": "status"
+        }
+       },
+       "right": "dnat"
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "meta": {
+         "key": "l4proto"
+        }
+       },
+       "right": {
+        "set": [
+         "tcp",
+         "udp"
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "ct": {
+         "key": "proto-dst",
+         "dir": "original"
+        }
+       },
+       "right": {
+        "set": [
+         53,
+         853
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "!=",
+       "left": {
+        "payload": {
+         "protocol": "ip",
+         "field": "saddr"
+        }
+       },
+       "right": "@listed4"
+      }
+     },
+     {
+      "counter": {
+       "packets": 9,
+       "bytes": 900
+      }
+     },
+     {
+      "drop": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "forward",
+    "handle": 20,
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "ip6",
+         "field": "saddr"
+        }
+       },
+       "right": "@pass6"
+      }
+     },
+     {
+      "accept": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "forward",
+    "handle": 23,
+    "expr": [
+     {
+      "match": {
+       "op": "in",
+       "left": {
+        "ct": {
+         "key": "status"
+        }
+       },
+       "right": "dnat"
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "meta": {
+         "key": "l4proto"
+        }
+       },
+       "right": {
+        "set": [
+         "tcp",
+         "udp"
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "ct": {
+         "key": "proto-dst",
+         "dir": "original"
+        }
+       },
+       "right": {
+        "set": [
+         53,
+         853
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "!=",
+       "left": {
+        "payload": {
+         "protocol": "ip6",
+         "field": "saddr"
+        }
+       },
+       "right": "@listed6"
+      }
+     },
+     {
+      "counter": {
+       "packets": 12,
+       "bytes": 1200
+      }
+     },
+     {
+      "drop": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "output",
+    "handle": 24,
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "ip",
+         "field": "daddr"
+        }
+       },
+       "right": "@pass4"
+      }
+     },
+     {
+      "accept": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "output",
+    "handle": 25,
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "ip6",
+         "field": "daddr"
+        }
+       },
+       "right": "@pass6"
+      }
+     },
+     {
+      "accept": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "output",
+    "handle": 28,
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "meta": {
+         "key": "l4proto"
+        }
+       },
+       "right": {
+        "set": [
+         "tcp",
+         "udp"
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "th",
+         "field": "dport"
+        }
+       },
+       "right": {
+        "set": [
+         53,
+         853
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "!=",
+       "left": {
+        "payload": {
+         "protocol": "ip",
+         "field": "daddr"
+        }
+       },
+       "right": "@listed4"
+      }
+     },
+     {
+      "counter": {
+       "packets": 15,
+       "bytes": 1500
+      }
+     },
+     {
+      "drop": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "geolock",
+    "chain": "output",
+    "handle": 31,
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "meta": {
+         "key": "l4proto"
+        }
+       },
+       "right": {
+        "set": [
+         "tcp",
+         "udp"
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "th",
+         "field": "dport"
+        }
+       },
+       "right": {
+        "set": [
+         53,
+         853
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "!=",
+       "left": {
+        "payload": {
+         "protocol": "ip6",
+         "field": "daddr"
+        }
+       },
+       "right": "@listed6"
+      }
+     },
+     {
+      "counter": {
+       "packets": 18,
+       "bytes": 1800
+      }
+     },
+     {
+      "drop": null
+     }
+    ]
+   }
+  },
+  {
+   "table": {
+    "family": "inet",
+    "name": "example_block",
+    "handle": 5
+   }
+  },
+  {
+   "chain": {
+    "family": "inet",
+    "table": "example_block",
+    "name": "input",
+    "handle": 1,
+    "type": "filter",
+    "hook": "input",
+    "prio": -9,
+    "policy": "accept"
+   }
+  },
+  {
+   "chain": {
+    "family": "inet",
+    "table": "example_block",
+    "name": "output",
+    "handle": 2,
+    "type": "filter",
+    "hook": "output",
+    "prio": -9,
+    "policy": "accept"
+   }
+  },
+  {
+   "set": {
+    "family": "inet",
+    "name": "in4",
+    "table": "example_block",
+    "type": "ipv4_addr",
+    "handle": 3,
+    "flags": [
+     "interval"
+    ],
+    "elem": [
+     {
+      "prefix": {
+       "addr": "203.0.113.0",
+       "len": 24
+      }
+     }
+    ]
+   }
+  },
+  {
+   "set": {
+    "family": "inet",
+    "name": "in6",
+    "table": "example_block",
+    "type": "ipv6_addr",
+    "handle": 4,
+    "flags": [
+     "interval"
+    ],
+    "elem": [
+     {
+      "prefix": {
+       "addr": "2001:db8:2::",
+       "len": 48
+      }
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "example_block",
+    "chain": "input",
+    "handle": 7,
+    "comment": "drop Example IPv4 DNS in",
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "meta": {
+         "key": "l4proto"
+        }
+       },
+       "right": {
+        "set": [
+         "tcp",
+         "udp"
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "th",
+         "field": "dport"
+        }
+       },
+       "right": {
+        "set": [
+         53,
+         853,
+         8443
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "ip",
+         "field": "saddr"
+        }
+       },
+       "right": "@in4"
+      }
+     },
+     {
+      "counter": {
+       "packets": 21,
+       "bytes": 2100
+      }
+     },
+     {
+      "drop": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "example_block",
+    "chain": "input",
+    "handle": 10,
+    "comment": "drop Example IPv6 DNS in",
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "meta": {
+         "key": "l4proto"
+        }
+       },
+       "right": {
+        "set": [
+         "tcp",
+         "udp"
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "th",
+         "field": "dport"
+        }
+       },
+       "right": {
+        "set": [
+         53,
+         853,
+         8443
+        ]
+       }
+      }
+     },
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "ip6",
+         "field": "saddr"
+        }
+       },
+       "right": "@in6"
+      }
+     },
+     {
+      "counter": {
+       "packets": 24,
+       "bytes": 2400
+      }
+     },
+     {
+      "drop": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "example_block",
+    "chain": "output",
+    "handle": 11,
+    "comment": "drop IPv4 Example",
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "ip",
+         "field": "daddr"
+        }
+       },
+       "right": "@in4"
+      }
+     },
+     {
+      "counter": {
+       "packets": 27,
+       "bytes": 2700
+      }
+     },
+     {
+      "drop": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "example_block",
+    "chain": "output",
+    "handle": 12,
+    "comment": "drop IPv6 Example",
+    "expr": [
+     {
+      "match": {
+       "op": "==",
+       "left": {
+        "payload": {
+         "protocol": "ip6",
+         "field": "daddr"
+        }
+       },
+       "right": "@in6"
+      }
+     },
+     {
+      "counter": {
+       "packets": 30,
+       "bytes": 3000
+      }
+     },
+     {
+      "drop": null
+     }
+    ]
+   }
+  },
+  {
+   "rule": {
+    "family": "inet",
+    "table": "example_block",
+    "chain": "output",
+    "handle": 13,
+    "comment": "not a drop",
+    "expr": [
+     {
+      "counter": {
+       "packets": 33,
+       "bytes": 3300
+      }
+     }
+    ]
+   }
+  }
+ ]
+}

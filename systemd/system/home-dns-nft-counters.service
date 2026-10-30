@@ -1,0 +1,20 @@
+# Writes nftables drop counters (geolock + country blocks) for Prometheus.
+# See docs/nft-counters.md. Runs as root only because nft needs CAP_NET_ADMIN.
+[Unit]
+Description=home-dns: export nftables drop counters to /var/lib/home-dns/metrics/nft.prom
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/install -d -m 0755 /var/lib/home-dns/metrics
+ExecStart=/usr/local/lib/home-dns/nft-counters.py --output /var/lib/home-dns/metrics/nft.prom
+CapabilityBoundingSet=CAP_NET_ADMIN
+AmbientCapabilities=
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/home-dns
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_NETLINK AF_UNIX
+Nice=10
+IOSchedulingClass=idle

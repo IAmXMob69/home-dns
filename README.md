@@ -81,6 +81,11 @@ All optional. Each one only touches its own entries, and `--dry-run` previews wh
 - **Geolock firewall (Linux)**: `cp geolock/settings.env.example geolock/settings.env`, set `GEOLOCK_ENABLED=1`, then `sudo ./scripts/geolock-apply.sh`.
   Allow mode (the default) drops DNS traffic from every country not in `GEOLOCK_ALLOW_COUNTRIES`. Deny mode drops only `GEOLOCK_DENY_COUNTRIES`.
   Your LAN, loopback and Tailscale are always allowed.
+  IPv4 only by default. Set `GEOLOCK_IPV6=1` to filter IPv6 too; otherwise allow mode leaves IPv6 unfiltered.
+  `GEOLOCK_INBOUND` and `GEOLOCK_OUTBOUND` turn each direction on or off on its own.
+  After loading, the script checks the live table matches the file. If loading or that check fails, it restores the previous table.
+  Test it without touching the host firewall: `unshare -rn tests/netns/geolock-netns.sh`.
+  Boot install (root-owned copy, failure is not ignored): see [docs/geolock-boot.md](docs/geolock-boot.md).
 - **Country-block zones**: `sudo nft -f automation/<name>-block/<name>-block.nft` for `africa`, `india`, `israel` or `saudi`.
   They stop this PC and its containers from connecting out to that region (all traffic, not just DNS).
 - **Malicious IPs**: `sudo ./scripts/malice-ip-apply.sh` drops the FireHOL level1 list. Never blocks your LAN or Tailscale.

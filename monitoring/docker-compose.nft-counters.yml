@@ -1,0 +1,11 @@
+# Optional overlay: serve the host's nftables drop counters through pihole-exporter.
+#   docker compose -f docker-compose.yml -f monitoring/docker-compose.nft-counters.yml \
+#     --profile monitoring up -d pihole-exporter
+# Needs home-dns-nft-counters.timer writing /var/lib/home-dns/metrics/nft.prom
+# (docs/nft-counters.md). Without that file the exporter simply adds nothing.
+services:
+  pihole-exporter:
+    environment:
+      EXTRA_METRICS_FILE: /host-metrics/nft.prom
+    volumes:
+      - /var/lib/home-dns/metrics:/host-metrics:ro

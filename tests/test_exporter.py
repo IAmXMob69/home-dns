@@ -143,6 +143,29 @@ def check(path):
         list(text_string_to_metric_families(text))
     except ImportError:
         pass
+    # EXTRA_METRICS_FILE (nft counters) is appended to /metrics when set.
+    if hasattr(exp, "extra_metrics"):
+        import os
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            prom = os.path.join(d, "nft.prom")
+            subprocess.run([sys.executable, str(ROOT / "monitoring/nft-counters.py"), "--input",
+                            str(ROOT / "tests/fixtures/nft-ruleset.json"), "--output", prom], check=True)
+            os.environ["EXTRA_METRICS_FILE"] = prom
+            combined = exp.format_metrics() + exp.extra_metrics()
+            os.environ["EXTRA_METRICS_FILE"] = os.path.join(d, "missing.prom")
+            if exp.extra_metrics() != "":
+                problems.append("missing EXTRA_METRICS_FILE should add nothing")
+            del os.environ["EXTRA_METRICS_FILE"]
+        if 'home_dns_nft_drop_packets_total{family="inet",table="geolock"' not in combined:
+            problems.append("nft counters missing from combined /metrics")
+        try:
+            from prometheus_client.parser import text_string_to_metric_families
+            list(text_string_to_metric_families(combined))
+        except ImportError:
+            pass
+
     srv.shutdown()
     return problems
 
