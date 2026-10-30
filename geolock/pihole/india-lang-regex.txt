@@ -1,0 +1,28 @@
+# India language block: Pi-hole regex deny entries.
+# Load with ./scripts/india-lang-pihole.sh (comment "india-lang IDN TLDs").
+#
+# India's internationalized (IDN) country-code TLDs, punycode form, taken from
+# the IANA root zone database (https://www.iana.org/domains/root/db), every
+# entry whose sponsor is the National Internet Exchange of India (NIXI):
+#   xn--h2brj9c       .भारत     Devanagari (Hindi, also Bodo, Dogri, Konkani, Maithili, Marathi, Nepali, Sanskrit, Santali, Sindhi)
+#   xn--h2breg3eve    .भारतम्    Devanagari (Sanskrit)
+#   xn--h2brj9c8c     .भारोत    Devanagari (Santali)
+#   xn--45brj9c       .ভারত     Bengali
+#   xn--45br5cyl      .ভাৰত     Bengali script (Assamese)
+#   xn--s9brj9c       .ਭਾਰਤ     Gurmukhi (Punjabi)
+#   xn--gecrj9c       .ભારત     Gujarati
+#   xn--3hcrj9c       .ଭାରତ     Oriya (Odia)
+#   xn--xkc2dl3a5ee0h .இந்தியா  Tamil
+#   xn--fpcrj9c3d     .భారత్    Telugu
+#   xn--2scrj9c       .ಭಾರತ     Kannada
+#   xn--rvc1e0am3e    .ഭാരതം    Malayalam
+#   xn--mgbbh1a71e    .بھارت    Arabic script (Urdu)
+#   xn--mgbbh1a       .بارت     Arabic script (Kashmiri)
+#   xn--mgbgu82a      .ڀارت     Arabic script (Sindhi)
+# Not included: xn--xkc2al3hye2a (.இலங்கை) belongs to Sri Lanka, not India.
+# The plain .in TLD is already in geolock/pihole/regex.txt as (^|\.)in$.
+#
+# Names in Indian scripts under other TLDs (for example .com) cannot be matched
+# by a regex, because Pi-hole only sees the punycode form. The Go tool
+# go/cmd/indic-idn-guard decodes them and adds exact deny entries.
+(^|\.)(xn--h2brj9c|xn--h2breg3eve|xn--h2brj9c8c|xn--45brj9c|xn--45br5cyl|xn--s9brj9c|xn--gecrj9c|xn--3hcrj9c|xn--xkc2dl3a5ee0h|xn--fpcrj9c3d|xn--2scrj9c|xn--rvc1e0am3e|xn--mgbbh1a71e|xn--mgbbh1a|xn--mgbgu82a)$

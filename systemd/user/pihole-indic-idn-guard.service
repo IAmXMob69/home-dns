@@ -1,0 +1,9 @@
+[Unit]
+Description=Deny DNS names written in Indian scripts (india-lang)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/home-dns/go/bin/indic-idn-guard --window 15m --max 200
+Nice=10
+NoNewPrivileges=yes

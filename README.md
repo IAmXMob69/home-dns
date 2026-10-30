@@ -89,6 +89,7 @@ All optional. Each one only touches its own entries, and `--dry-run` previews wh
 - **Country-block zones**: `sudo nft -f automation/<name>-block/<name>-block.nft` for `africa`, `india`, `israel` or `saudi`.
   They stop this PC and its containers from connecting out to that region (all traffic, not just DNS).
 - **Malicious IPs**: `sudo ./scripts/malice-ip-apply.sh` drops the FireHOL level1 list. Never blocks your LAN or Tailscale.
+- **India block**: the `.in` regex, India's IDN TLDs, names in Indian scripts (`indic-idn-guard`) and an all-ports inbound firewall for Indian IP space. See [INDIA_BLOCK.md](./INDIA_BLOCK.md).
 - **Privacy shield**: `./scripts/privacy-shield-pihole.sh` blocks telemetry and analytics. Toggle it in Pi-hole: Groups → Data collection halt.
 
 Do not add `1.1.1.1` to Pi-hole's upstream servers; that skips the blocker. Do not open port 53 to the internet.
@@ -266,6 +267,7 @@ Firewall and lists:
 - `install-privacy-shield` (`automation/`): load the privacy-shield deny rules.
 - `import-lists`, `import-webpwnized-lists` (`automation/import-lists.*`): add adlists from a list file.
 - `update-gravity` (`automation/`): refresh Pi-hole's blocklists.
+- `indic-idn-guard`: deny names written in Indian scripts. Go only, see [INDIA_BLOCK.md](./INDIA_BLOCK.md).
 
 Upkeep and checks:
 
@@ -282,7 +284,7 @@ Upkeep and checks:
 ## Timers (systemd)
 
 `systemd/user/` has timers for the watchdog (every 30 s), healthcheck (hourly), gravity (daily), cleanup (daily),
-backup, image updates and the certificate (weekly). They expect the checkout at `~/home-dns`.
+backup, image updates and the certificate (weekly), and `indic-idn-guard` (every 2 min). They expect the checkout at `~/home-dns`.
 `systemd/system/pihole-tailscale-dns.service` republishes Tailscale DNS at boot. Install steps: [systemd/README.md](./systemd/README.md).
 
 ## Rollback
@@ -291,6 +293,7 @@ backup, image updates and the certificate (weekly). They expect the checkout at 
 - One tool back to shell or Python: `PIHOLE_NO_GO=1 ./<script>`. All of them: `make -C go clean`.
 - Geolock firewall: set `GEOLOCK_ENABLED=0` in `geolock/settings.env` and run `sudo ./scripts/geolock-apply.sh` again.
 - A country zone: `sudo nft delete table inet <name>_block` (for example `africa_block`).
+- India block: see [INDIA_BLOCK.md](./INDIA_BLOCK.md#undo).
 - Malicious-IP list: `sudo nft delete table inet malice_block`, and remove its file from `/etc/nftables.d` so it stays off after reboot.
 - Pi-hole groups: switch them off in Group management → Groups.
 - Whole stack: `docker compose down`.

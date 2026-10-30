@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: shellcheck
-        run: shellcheck install.sh scripts/*.sh *.sh lib/*.sh automation/*.sh tests/*.sh tests/netns/*.sh
+        run: shellcheck install.sh scripts/*.sh *.sh lib/*.sh automation/*.sh automation/india-inbound/*.sh tests/*.sh tests/netns/*.sh
       - name: yamllint
         run: |
           pip install "yamllint==${YAMLLINT_VERSION}"
@@ -54,6 +54,10 @@ jobs:
           go vet ./...
           go test ./...
           go build ./...
+      - name: India IDN TLD list matches indic-idn-guard
+        run: |
+          diff <(grep -v '^#' geolock/pihole/india-lang-regex.txt | grep -o 'xn--[a-z0-9-]*' | sort) \
+               <(grep -o '^\s*"xn--[a-z0-9-]*"' go/cmd/indic-idn-guard/main.go | tr -d ' \t"' | sort)
 
   compose:
     runs-on: ubuntu-latest
@@ -128,3 +132,7 @@ jobs:
             https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset
           sudo MALICE_NFT_DIR="$RUNNER_TEMP/nftables.d" MALICE_NFT_CONF=/nonexistent \
             MALICE_URL="file://$RUNNER_TEMP/level1.netset" unshare -n bash scripts/malice-ip-apply.sh
+      - name: india inbound block loads in a throwaway netns
+        run: |
+          sudo unshare -n nft -c -f automation/india-inbound/india-inbound-block.nft
+          sudo unshare -n bash -c 'nft -f automation/india-inbound/india-inbound-block.nft && nft list table inet india_inbound >/dev/null'
