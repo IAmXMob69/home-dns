@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.13"
       - name: shellcheck
-        run: shellcheck install.sh scripts/*.sh *.sh lib/*.sh automation/*.sh
+        run: shellcheck install.sh scripts/*.sh *.sh lib/*.sh automation/*.sh tests/*.sh tests/netns/*.sh
       - name: yamllint
         run: |
           pip install "yamllint==${YAMLLINT_VERSION}"
@@ -39,6 +39,7 @@ jobs:
           pip install requests prometheus_client
           python tests/test_exporter.py
           python tests/test_pihole_groups.py
+          python tests/test_nft_counters.py
 
   go:
     runs-on: ubuntu-latest
@@ -65,6 +66,8 @@ jobs:
           docker compose -f docker-compose.yml config --quiet
           docker compose -f docker-compose.yml -f docker-compose.tailscale.yml config --quiet
           docker compose --profile monitoring config --quiet
+          docker compose -f docker-compose.yml -f monitoring/docker-compose.nft-counters.yml \
+            --profile monitoring config --quiet
 
   dnscrypt:
     runs-on: ubuntu-latest
@@ -101,13 +104,24 @@ jobs:
           grep '^GEOLOCK_DENY_COUNTRIES=' geolock/settings.env.example > "$RUNNER_TEMP/deny.env"
           printf 'GEOLOCK_ENABLED=1\nGEOLOCK_MODE=deny\n' >> "$RUNNER_TEMP/deny.env"
           for mode in allow deny; do
-            sudo GEOLOCK_SETTINGS="$RUNNER_TEMP/$mode.env" GEOLOCK_CACHE="$RUNNER_TEMP/geo" GEOLOCK_DRY_RUN=1 \
-              PIHOLE_NO_GO=1 bash scripts/geolock-apply.sh
-            cp "$RUNNER_TEMP/geo/geolock.nft" "$RUNNER_TEMP/$mode-bash.nft"
-            sudo GEOLOCK_SETTINGS="$RUNNER_TEMP/$mode.env" GEOLOCK_CACHE="$RUNNER_TEMP/geo" GEOLOCK_DRY_RUN=1 \
-              PIHOLE_ROOT="$PWD" "$RUNNER_TEMP/geolock-apply"
-            cmp "$RUNNER_TEMP/$mode-bash.nft" "$RUNNER_TEMP/geo/geolock.nft"
+            for extra in "" "GEOLOCK_IPV6=1" "GEOLOCK_IPV6=1 GEOLOCK_INBOUND=0" "GEOLOCK_IPV6=1 GEOLOCK_OUTBOUND=0" \
+                "GEOLOCK_OUTBOUND=0"; do
+              echo "== $mode $extra"
+              { cat "$RUNNER_TEMP/$mode.env"; printf '%s\n' $extra; } > "$RUNNER_TEMP/case.env"
+              sudo GEOLOCK_SETTINGS="$RUNNER_TEMP/case.env" GEOLOCK_CACHE="$RUNNER_TEMP/geo" GEOLOCK_DRY_RUN=1 \
+                PIHOLE_NO_GO=1 bash scripts/geolock-apply.sh
+              cp "$RUNNER_TEMP/geo/geolock.nft" "$RUNNER_TEMP/bash.nft"
+              sudo GEOLOCK_SETTINGS="$RUNNER_TEMP/case.env" GEOLOCK_CACHE="$RUNNER_TEMP/geo" GEOLOCK_DRY_RUN=1 \
+                PIHOLE_ROOT="$PWD" "$RUNNER_TEMP/geolock-apply"
+              cmp "$RUNNER_TEMP/bash.nft" "$RUNNER_TEMP/geo/geolock.nft"
+            done
           done
+      - name: geolock in a throwaway netns (DNS probes, IPv4/IPv6, rollback, counters)
+        run: |
+          (cd go && go build -o bin/geolock-apply ./cmd/geolock-apply)
+          sudo unshare -n env GEOLOCK_GO_BIN="$PWD/go/bin/geolock-apply" bash tests/netns/geolock-netns.sh
+      - name: boot installer against a fake root
+        run: sudo bash tests/install-geolock-system-test.sh
       - name: malice ruleset loads in a throwaway netns
         run: |
           curl -fsSL -o "$RUNNER_TEMP/level1.netset" \

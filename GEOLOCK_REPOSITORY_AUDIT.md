@@ -151,23 +151,23 @@ geolock load at boot would go unnoticed.
 
 | # | Severity | Finding | Status |
 |---|---|---|---|
-| 1 | High | Live boot unit runs a user-owned script and user-owned `go/bin` binary as root (local privilege escalation path), and the geolock step is `ExecStartPost=-...`, i.e. fail-open. | Live-only; **recommendation**, not changed |
+| 1 | High | Live boot unit runs a user-owned script and user-owned `go/bin` binary as root (local privilege escalation path), and the geolock step is `ExecStartPost=-...`, i.e. fail-open. | **Fix prepared** (`scripts/install-geolock-system.sh`, not applied): root-owned copy, no `-` |
 | 2 | Medium | Leading-zero octets are read as octal by nft (`010.0.0.0/8` -> `8.0.0.0/8`). | **Fixed**, tested |
 | 3 | Medium | `/0`, host bits, octets > 255, `/33`-`/99` accepted by the validator. | **Fixed**, tested |
 | 4 | Medium | Cached lists never re-validated; a bad or old-format cache reached nft. | **Fixed**: every run re-validates, dies with "nothing changed" |
 | 5 | Medium | Go continued after a cache read error and built a partial allow list (`origin/main:go/cmd/geolock-apply/main.go:309-312`); Bash aborted. | **Fixed**, Go now aborts like Bash |
-| 6 | Medium | Geolock is IPv4 only although the table is `inet`; IPv6 on 53/853 is not geolocked. | Documented; scope chosen deliberately, unchanged |
+| 6 | Medium | Geolock is IPv4 only although the table is `inet`; IPv6 on 53/853 is not geolocked. | **Switch added**: `GEOLOCK_IPV6=1` builds `listed6`/`pass6`; default 0 keeps the live ruleset byte-identical |
 | 7 | Medium | Repo country tables lack the live inbound DNS `input` chains (drift). | Documented |
 | 8 | Low | `999.x` style entries make nft do DNS lookups at load. | **Fixed** (rejected) |
 | 9 | Low | `GEOLOCK_APP_CGROUP` was interpolated into the ruleset unchecked (quote injection, e.g. `a" accept comment "`); Bash stripped one leading `/`, Go all of them. | **Fixed**: validated in both, same trimming |
 | 10 | Low | Non-digit lines silently dropped (e.g. IPv6 in a v4 list). | **Fixed**: now an error naming the line |
 | 11 | Low | No refresh timer; staleness only handled at boot. | Recommendation |
-| 12 | Low | No post-load verification or rollback. | Step 4 |
-| 13 | Low | No firewall metrics. | Recommendation |
+| 12 | Low | No post-load verification or rollback. | **Fixed**: verify drop rules and set contents after load, else reload the previous table (Bash and Go) |
+| 13 | Low | No firewall metrics. | **Added** `monitoring/nft-counters.py` (not deployed; `docs/nft-counters.md`) |
 | 14 | Low | Country `forward` counters count reply packets, so inbound blocks are attributed to the wrong rule. | Documented |
 | 15 | Low | Redundant `iifname/oifname tailscale0` forward rules (a catch-all drop follows). | Documented |
 | 16 | Low | `dns_egress` table and `vaultos-*` units not in the repo. | Documented |
-| 17 | Low | `settings.env.example` lacks `GEOLOCK_MAX_AGE_DAYS`; orphan uppercase cache files. | Documented |
+| 17 | Low | `settings.env.example` lacks `GEOLOCK_MAX_AGE_DAYS`; orphan uppercase cache files. | Example **fixed**; orphan files documented |
 | 18 | Low | `GEOLOCK_PORTS` accepts out-of-range ports (caught later by `nft -c`). | Documented |
 
 ## 8. Verification of this branch
@@ -212,3 +212,40 @@ bug 1) and drop the `-` from the geolock `ExecStartPost` once rollback exists;
 add an nft counters exporter (per-table drop counters, list age, element
 counts) to Prometheus; add a weekly refresh timer; bring the live country-table
 input chains and `dns_egress` into the repo.
+
+## 10. Status of steps 3-6
+
+**Step 3 (Rust updater): blocked.** No `rustc`, `cargo` or `rustup` on the
+host, and installing the `rust` package needs root. Not started; the plan in
+section 9 stands. Go and Bash already validate every list, so nothing depends on it.
+
+**Step 4 (IPv4/IPv6 + rollback): done** on branch `geolock-ipv6`, Bash and Go.
+
+* `GEOLOCK_IPV6` (default 0) adds `pass6` (`::1/128`, `fe80::/10`, `fc00::/7`)
+  and `listed6`, and an `ip6` rule after every `ip` rule. Countries with no
+  IPv6 list upstream (404, e.g. CF, ER) are logged and listed as empty; a 404
+  never replaces a good cached list.
+* `GEOLOCK_INBOUND` / `GEOLOCK_OUTBOUND` (default 1) switch the input+forward
+  chains and the output chain independently.
+* Load: snapshot the current table (checked with `nft -c`), load, then verify
+  the number of drop rules per chain and the first element of each set. On any
+  failure the previous table is reloaded and the run fails; with no previous
+  table the new one is kept (never removes protection). `GEOLOCK_NFT` lets tests
+  inject failures.
+* With today's settings (IPv6 off) the output is byte-identical to the live
+  `geolock.nft`; Bash and Go agree on every combination (allow/deny, IPv6 on/off,
+  each direction).
+
+**Step 5 (namespace first): harness added**, `tests/netns/geolock-netns.sh`.
+It builds a server and a client namespace joined by a veth pair (documentation
+prefixes only), runs a small DNS responder on both sides, and checks queries
+from listed and unlisted sources, inbound and outbound, IPv4 and IPv6, UDP and
+TCP, for each implementation, plus rollback on an injected load failure and on
+an injected verify failure. Runs unprivileged with `unshare -rn`; CI runs it
+with `sudo unshare -n`.
+
+Boot fix: `scripts/install-geolock-system.sh` (preview with `--dry-run`, undo
+with `--rollback`). It refuses to install unless the new root-owned copy
+renders the live ruleset byte-for-byte. See `docs/geolock-boot.md`.
+
+**Step 6 (monitoring): exporter added, not deployed.** See `docs/nft-counters.md`.
