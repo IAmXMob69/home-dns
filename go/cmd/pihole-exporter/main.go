@@ -586,6 +586,27 @@ func Format(s Snapshot) string {
 	return b.String()
 }
 
+// maxExtra caps EXTRA_METRICS_FILE so a runaway writer cannot bloat scrapes.
+const maxExtra = 4 << 20
+
+// ExtraMetrics returns the contents of EXTRA_METRICS_FILE (a Prometheus text
+// file written by another job, e.g. monitoring/nft-counters.py), or "" when it
+// is unset, missing, unreadable or too large.
+func ExtraMetrics() string {
+	path := os.Getenv("EXTRA_METRICS_FILE")
+	if path == "" {
+		return ""
+	}
+	b, err := os.ReadFile(path)
+	if err != nil || len(b) == 0 || len(b) > maxExtra {
+		return ""
+	}
+	if b[len(b)-1] != '\n' {
+		b = append(b, '\n')
+	}
+	return string(b)
+}
+
 func (e *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusNotImplemented)
@@ -596,6 +617,7 @@ func (e *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e.mu.Lock()
 		body := Format(e.snap)
 		e.mu.Unlock()
+		body += ExtraMetrics()
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 		w.WriteHeader(200)

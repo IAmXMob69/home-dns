@@ -251,10 +251,28 @@ def format_metrics():
     return "\n".join(lines) + "\n"
 
 
+EXTRA_MAX = 4 << 20
+
+
+def extra_metrics():
+    """EXTRA_METRICS_FILE contents (e.g. from monitoring/nft-counters.py), or ""."""
+    path = os.getenv("EXTRA_METRICS_FILE", "")
+    if not path:
+        return ""
+    try:
+        with open(path) as f:
+            text = f.read(EXTRA_MAX + 1)
+    except OSError:
+        return ""
+    if not text or len(text) > EXTRA_MAX:
+        return ""
+    return text if text.endswith("\n") else text + "\n"
+
+
 class MetricsHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/metrics":
-            body = format_metrics().encode()
+            body = (format_metrics() + extra_metrics()).encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
