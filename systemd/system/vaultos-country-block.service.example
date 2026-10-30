@@ -1,0 +1,20 @@
+# The country-block unit after the boot fix (unit file plus the drop-in above).
+# The unit file itself is not changed by scripts/install-geolock-system.sh.
+[Unit]
+Description=Vault.OS country IP blocks (India, Africa, Israel, Saudi), malicious-IP block, and DNS geolock
+After=network-pre.target ufw.service docker.service
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/nft -f /etc/nftables.d/india-block.nft
+ExecStart=/usr/bin/nft -f /etc/nftables.d/africa-block.nft
+ExecStart=/usr/bin/nft -f /etc/nftables.d/israel-block.nft
+ExecStart=/usr/bin/nft -f /etc/nftables.d/saudi-block.nft
+ExecStart=/usr/bin/nft -f /etc/nftables.d/malice-block.nft
+# Root-owned copy; reads /etc/home-dns/geolock.service.env. No "-": failure is visible.
+ExecStartPost=/usr/local/lib/home-dns/geolock
+
+[Install]
+WantedBy=multi-user.target
