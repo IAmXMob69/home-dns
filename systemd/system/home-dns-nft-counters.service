@@ -5,13 +5,17 @@ Description=home-dns: export nftables drop counters to /var/lib/home-dns/metrics
 
 [Service]
 Type=oneshot
-ExecStartPre=/usr/bin/install -d -m 0755 /var/lib/home-dns/metrics
-ExecStart=/usr/local/lib/home-dns/nft-counters.py --output /var/lib/home-dns/metrics/nft.prom
+# StateDirectory creates the directory and makes it writable under
+# ProtectSystem=strict. (ReadWritePaths= on a missing path fails the unit.)
+StateDirectory=home-dns/metrics
+StateDirectoryMode=0755
+# Not under /usr/local/lib/home-dns: install-geolock-system.sh --rollback
+# replaces that directory.
+ExecStart=/usr/local/sbin/home-dns-nft-counters --output /var/lib/home-dns/metrics/nft.prom
 CapabilityBoundingSet=CAP_NET_ADMIN
 AmbientCapabilities=
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/var/lib/home-dns
 ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes
