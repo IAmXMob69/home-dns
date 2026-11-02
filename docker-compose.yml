@@ -300,7 +300,7 @@ services:
       default:
         ipv4_address: 172.30.90.6
     # Grafana 13.2.1, pinned by digest 2026-10-22 (no upgrade).
-    image: grafana/grafana@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+    image: grafana/grafana@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
