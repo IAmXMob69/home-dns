@@ -49,7 +49,7 @@ services:
       - no-new-privileges:true
     pids_limit: 128
     # Unbound 1.26.2, pinned by digest 2026-10-22 (no upgrade).
-    image: klutchell/unbound@sha256:50cbeb32b5838a829a7226b19cb151f9535bd7f9f3190f950780f452fe807478
+    image: klutchell/unbound@sha256:de8e624f84337bdb2d16540c0b203d5df2a981180421cb50ab4212b67542d8b4
     hostname: unbound
     networks:
       default:
